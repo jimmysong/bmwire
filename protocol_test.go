@@ -7,7 +7,7 @@ package bmwire_test
 import (
 	"testing"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/jimmysong/bmwire"
 )
 
 // TestServiceFlagStringer tests the stringized output for service flag types.

@@ -7,7 +7,7 @@ package bmwire_test
 import (
 	"io"
 
-	"github.com/btcsuite/btcd/wire"
+	"github.com/jimmysong/bmwire"
 )
 
 // fakeMessage implements the wire.Message interface and is used to force
