@@ -171,12 +171,12 @@ func (msg *MsgTx) TxSha() (ShaHash, error) {
 	// Ignore the error returns since the only way the encode could fail
 	// is being out of memory or due to nil pointers, both of which would
 	// cause a run-time panic.  Also, SetBytes can't fail here due to the
-	// fact DoubleSha256 always returns a []byte of the right size
+	// fact Sha512 always returns a []byte of the right size
 	// regardless of input.
 	buf := bytes.NewBuffer(make([]byte, 0, msg.SerializeSize()))
 	_ = msg.Serialize(buf)
 	var sha ShaHash
-	_ = sha.SetBytes(DoubleSha256(buf.Bytes()))
+	_ = sha.SetBytes(Sha512(buf.Bytes()))
 
 	// Even though this function can't currently fail, it still returns
 	// a potential error to help future proof the API should a failure
@@ -256,7 +256,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	msg.Version = int32(binary.LittleEndian.Uint32(buf[:]))
+	msg.Version = int32(binary.BigEndian.Uint32(buf[:]))
 
 	count, err := readVarInt(r, pver)
 	if err != nil {
@@ -312,7 +312,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	msg.LockTime = binary.LittleEndian.Uint32(buf[:])
+	msg.LockTime = binary.BigEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -340,7 +340,7 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 // database, as opposed to encoding transactions for the wire.
 func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], uint32(msg.Version))
+	binary.BigEndian.PutUint32(buf[:], uint32(msg.Version))
 	_, err := w.Write(buf[:])
 	if err != nil {
 		return err
@@ -372,7 +372,7 @@ func (msg *MsgTx) BtcEncode(w io.Writer, pver uint32) error {
 		}
 	}
 
-	binary.LittleEndian.PutUint32(buf[:], msg.LockTime)
+	binary.BigEndian.PutUint32(buf[:], msg.LockTime)
 	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
@@ -455,7 +455,7 @@ func readOutPoint(r io.Reader, pver uint32, version int32, op *OutPoint) error {
 	if err != nil {
 		return err
 	}
-	op.Index = binary.LittleEndian.Uint32(buf[:])
+	op.Index = binary.BigEndian.Uint32(buf[:])
 	return nil
 }
 
@@ -468,7 +468,7 @@ func writeOutPoint(w io.Writer, pver uint32, version int32, op *OutPoint) error 
 	}
 
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], op.Index)
+	binary.BigEndian.PutUint32(buf[:], op.Index)
 	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
@@ -497,7 +497,7 @@ func readTxIn(r io.Reader, pver uint32, version int32, ti *TxIn) error {
 	if err != nil {
 		return err
 	}
-	ti.Sequence = binary.LittleEndian.Uint32(buf[:])
+	ti.Sequence = binary.BigEndian.Uint32(buf[:])
 
 	return nil
 }
@@ -516,7 +516,7 @@ func writeTxIn(w io.Writer, pver uint32, version int32, ti *TxIn) error {
 	}
 
 	var buf [4]byte
-	binary.LittleEndian.PutUint32(buf[:], ti.Sequence)
+	binary.BigEndian.PutUint32(buf[:], ti.Sequence)
 	_, err = w.Write(buf[:])
 	if err != nil {
 		return err
@@ -533,7 +533,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 	if err != nil {
 		return err
 	}
-	to.Value = int64(binary.LittleEndian.Uint64(buf[:]))
+	to.Value = int64(binary.BigEndian.Uint64(buf[:]))
 
 	to.PkScript, err = readVarBytes(r, pver, MaxMessagePayload,
 		"transaction output public key script")
@@ -548,7 +548,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], uint64(to.Value))
+	binary.BigEndian.PutUint64(buf[:], uint64(to.Value))
 	_, err := w.Write(buf[:])
 	if err != nil {
 		return err

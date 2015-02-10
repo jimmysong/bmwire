@@ -46,11 +46,11 @@ const blockHeaderLen = 80
 
 // BlockSha computes the block identifier hash for the given block header.
 func (h *BlockHeader) BlockSha() (ShaHash, error) {
-	// Encode the header and run double sha256 everything prior to the
+	// Encode the header and run sha512 everything prior to the
 	// number of transactions.  Ignore the error returns since there is no
 	// way the encode could fail except being out of memory which would
 	// cause a run-time panic.  Also, SetBytes can't fail here due to the
-	// fact DoubleSha256 always returns a []byte of the right size
+	// fact Sha512 always returns a []byte of the right size
 	// regardless of input.
 	var buf bytes.Buffer
 	var sha ShaHash

@@ -11,19 +11,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-
-	"github.com/btcsuite/fastsha256"
 )
 
 // Maximum payload size for a variable length integer.
 const MaxVarIntPayload = 9
-
-func Sha512(b []byte) []byte {
-	t := sha512.Sum512(b)
-	sha := make([]byte, 512/8)
-	copy(sha, t[:])
-	return sha
-}
 
 // readElement reads the next sequence of bytes from r using little endian
 // depending on the concrete type of element pointed to.
@@ -39,7 +30,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = int32(binary.LittleEndian.Uint32(b))
+		*e = int32(binary.BigEndian.Uint32(b))
 		return nil
 
 	case *uint32:
@@ -48,7 +39,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = binary.LittleEndian.Uint32(b)
+		*e = binary.BigEndian.Uint32(b)
 		return nil
 
 	case *int64:
@@ -57,7 +48,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = int64(binary.LittleEndian.Uint64(b))
+		*e = int64(binary.BigEndian.Uint64(b))
 		return nil
 
 	case *uint64:
@@ -66,7 +57,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = binary.LittleEndian.Uint64(b)
+		*e = binary.BigEndian.Uint64(b)
 		return nil
 
 	case *bool:
@@ -119,7 +110,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = ServiceFlag(binary.LittleEndian.Uint64(b))
+		*e = ServiceFlag(binary.BigEndian.Uint64(b))
 		return nil
 
 	case *InvType:
@@ -128,7 +119,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = InvType(binary.LittleEndian.Uint32(b))
+		*e = InvType(binary.BigEndian.Uint32(b))
 		return nil
 
 	case *BitcoinNet:
@@ -137,7 +128,7 @@ func readElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		*e = BitcoinNet(binary.LittleEndian.Uint32(b))
+		*e = BitcoinNet(binary.BigEndian.Uint32(b))
 		return nil
 
 	case *BloomUpdateType:
@@ -161,7 +152,7 @@ func readElement(r io.Reader, element interface{}) error {
 
 	// Fall back to the slower binary.Read if a fast path was not available
 	// above.
-	return binary.Read(r, binary.LittleEndian, element)
+	return binary.Read(r, binary.BigEndian, element)
 }
 
 // readElements reads multiple items from r.  It is equivalent to multiple
@@ -185,7 +176,7 @@ func writeElement(w io.Writer, element interface{}) error {
 	switch e := element.(type) {
 	case int32:
 		b := scratch[0:4]
-		binary.LittleEndian.PutUint32(b, uint32(e))
+		binary.BigEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -194,7 +185,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case uint32:
 		b := scratch[0:4]
-		binary.LittleEndian.PutUint32(b, e)
+		binary.BigEndian.PutUint32(b, e)
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -203,7 +194,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case int64:
 		b := scratch[0:8]
-		binary.LittleEndian.PutUint64(b, uint64(e))
+		binary.BigEndian.PutUint64(b, uint64(e))
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -212,7 +203,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case uint64:
 		b := scratch[0:8]
-		binary.LittleEndian.PutUint64(b, e)
+		binary.BigEndian.PutUint64(b, e)
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -265,7 +256,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case ServiceFlag:
 		b := scratch[0:8]
-		binary.LittleEndian.PutUint64(b, uint64(e))
+		binary.BigEndian.PutUint64(b, uint64(e))
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -274,7 +265,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case InvType:
 		b := scratch[0:4]
-		binary.LittleEndian.PutUint32(b, uint32(e))
+		binary.BigEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -283,7 +274,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case BitcoinNet:
 		b := scratch[0:4]
-		binary.LittleEndian.PutUint32(b, uint32(e))
+		binary.BigEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
 		if err != nil {
 			return err
@@ -311,7 +302,7 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	// Fall back to the slower binary.Write if a fast path was not available
 	// above.
-	return binary.Write(w, binary.LittleEndian, element)
+	return binary.Write(w, binary.BigEndian, element)
 }
 
 // writeElements writes multiple items to w.  It is equivalent to multiple
@@ -342,21 +333,21 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
-		rv = binary.LittleEndian.Uint64(b[:])
+		rv = binary.BigEndian.Uint64(b[:])
 
 	case 0xfe:
 		_, err := io.ReadFull(r, b[0:4])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(binary.LittleEndian.Uint32(b[:]))
+		rv = uint64(binary.BigEndian.Uint32(b[:]))
 
 	case 0xfd:
 		_, err := io.ReadFull(r, b[0:2])
 		if err != nil {
 			return 0, err
 		}
-		rv = uint64(binary.LittleEndian.Uint16(b[:]))
+		rv = uint64(binary.BigEndian.Uint16(b[:]))
 
 	default:
 		rv = uint64(discriminant)
@@ -376,7 +367,7 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	if val <= math.MaxUint16 {
 		var buf [3]byte
 		buf[0] = 0xfd
-		binary.LittleEndian.PutUint16(buf[1:], uint16(val))
+		binary.BigEndian.PutUint16(buf[1:], uint16(val))
 		_, err := w.Write(buf[:])
 		return err
 	}
@@ -384,14 +375,14 @@ func writeVarInt(w io.Writer, pver uint32, val uint64) error {
 	if val <= math.MaxUint32 {
 		var buf [5]byte
 		buf[0] = 0xfe
-		binary.LittleEndian.PutUint32(buf[1:], uint32(val))
+		binary.BigEndian.PutUint32(buf[1:], uint32(val))
 		_, err := w.Write(buf[:])
 		return err
 	}
 
 	var buf [9]byte
 	buf[0] = 0xff
-	binary.LittleEndian.PutUint64(buf[1:], val)
+	binary.BigEndian.PutUint64(buf[1:], val)
 	_, err := w.Write(buf[:])
 	return err
 }
@@ -528,12 +519,10 @@ func RandomUint64() (uint64, error) {
 	return randomUint64(rand.Reader)
 }
 
-// DoubleSha256 calculates sha256(sha256(b)) and returns the resulting bytes.
-func DoubleSha256(b []byte) []byte {
-	hasher := fastsha256.New()
-	hasher.Write(b)
-	sum := hasher.Sum(nil)
-	hasher.Reset()
-	hasher.Write(sum)
-	return hasher.Sum(nil)
+// Sha512 returns the sha256 of the bytes
+func Sha512(b []byte) []byte {
+	t := sha512.Sum512(b)
+	sha := make([]byte, 512/8)
+	copy(sha, t[:])
+	return sha
 }
