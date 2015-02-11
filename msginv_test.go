@@ -10,17 +10,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jimmysong/bmwire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/jimmysong/bmwire"
 )
 
 // TestInv tests the MsgInv API.
 func TestInv(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := bmwire.ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "inv"
-	msg := wire.NewMsgInv()
+	msg := bmwire.NewMsgInv()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgInv: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -37,8 +37,8 @@ func TestInv(t *testing.T) {
 	}
 
 	// Ensure inventory vectors are added properly.
-	hash := wire.ShaHash{}
-	iv := wire.NewInvVect(wire.InvTypeBlock, &hash)
+	hash := bmwire.ShaHash{}
+	iv := bmwire.NewInvVect(&hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
 		t.Errorf("AddInvVect: %v", err)
@@ -50,7 +50,7 @@ func TestInv(t *testing.T) {
 
 	// Ensure adding more than the max allowed inventory vectors per
 	// message returns an error.
-	for i := 0; i < wire.MaxInvPerMsg; i++ {
+	for i := 0; i < bmwire.MaxInvPerMsg; i++ {
 		err = msg.AddInvVect(iv)
 	}
 	if err == nil {
@@ -60,8 +60,8 @@ func TestInv(t *testing.T) {
 
 	// Ensure creating the message with a size hint larger than the max
 	// works as expected.
-	msg = wire.NewMsgInvSizeHint(wire.MaxInvPerMsg + 1)
-	wantCap := wire.MaxInvPerMsg
+	msg = bmwire.NewMsgInvSizeHint(bmwire.MaxInvPerMsg + 1)
+	wantCap := bmwire.MaxInvPerMsg
 	if cap(msg.InvList) != wantCap {
 		t.Errorf("NewMsgInvSizeHint: wrong cap for size hint - "+
 			"got %v, want %v", cap(msg.InvList), wantCap)
@@ -70,34 +70,34 @@ func TestInv(t *testing.T) {
 	return
 }
 
-// TestInvWire tests the MsgInv wire encode and decode for various numbers
+// TestInvWire tests the MsgInv bmwire.encode and decode for various numbers
 // of inventory vectors and protocol versions.
 func TestInvWire(t *testing.T) {
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := wire.NewShaHashFromStr(hashStr)
+	blockHash, err := bmwire.NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	// Transation 1 of Block 203707 hash.
 	hashStr = "d28a3dc7392bf00a9855ee93dd9a81eff82a2c4fe57fbd42cfe71b487accfaf0"
-	txHash, err := wire.NewShaHashFromStr(hashStr)
+	txHash, err := bmwire.NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
-	iv2 := wire.NewInvVect(wire.InvTypeTx, txHash)
+	iv := bmwire.NewInvVect(blockHash)
+	iv2 := bmwire.NewInvVect(txHash)
 
 	// Empty inv message.
-	NoInv := wire.NewMsgInv()
+	NoInv := bmwire.NewMsgInv()
 	NoInvEncoded := []byte{
 		0x00, // Varint for number of inventory vectors
 	}
 
 	// Inv message with multiple inventory vectors.
-	MultiInv := wire.NewMsgInv()
+	MultiInv := bmwire.NewMsgInv()
 	MultiInv.AddInvVect(iv)
 	MultiInv.AddInvVect(iv2)
 	MultiInvEncoded := []byte{
@@ -115,17 +115,17 @@ func TestInvWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgInv // Message to encode
-		out  *wire.MsgInv // Expected decoded message
-		buf  []byte       // Wire encoding
-		pver uint32       // Protocol version for wire encoding
+		in   *bmwire.MsgInv // Message to encode
+		out  *bmwire.MsgInv // Expected decoded message
+		buf  []byte         // Wire encoding
+		pver uint32         // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version with no inv vectors.
 		{
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple inv vectors.
@@ -133,7 +133,7 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version no inv vectors.
@@ -141,7 +141,7 @@ func TestInvWire(t *testing.T) {
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.BIP0035Version,
+			bmwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0035Version with multiple inv vectors.
@@ -149,7 +149,7 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.BIP0035Version,
+			bmwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version no inv vectors.
@@ -157,7 +157,7 @@ func TestInvWire(t *testing.T) {
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.BIP0031Version,
+			bmwire.BIP0031Version,
 		},
 
 		// Protocol version BIP0031Version with multiple inv vectors.
@@ -165,7 +165,7 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.BIP0031Version,
+			bmwire.BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion no inv vectors.
@@ -173,7 +173,7 @@ func TestInvWire(t *testing.T) {
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion with multiple inv vectors.
@@ -181,7 +181,7 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion no inv vectors.
@@ -189,7 +189,7 @@ func TestInvWire(t *testing.T) {
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			wire.MultipleAddressVersion,
+			bmwire.MultipleAddressVersion,
 		},
 
 		// Protocol version MultipleAddressVersion with multiple inv vectors.
@@ -197,13 +197,13 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			wire.MultipleAddressVersion,
+			bmwire.MultipleAddressVersion,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode the message to wire format.
+		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
 		err := test.in.BtcEncode(&buf, test.pver)
 		if err != nil {
@@ -216,8 +216,8 @@ func TestInvWire(t *testing.T) {
 			continue
 		}
 
-		// Decode the message from wire format.
-		var msg wire.MsgInv
+		// Decode the message from bmwire.format.
+		var msg bmwire.MsgInv
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -232,23 +232,23 @@ func TestInvWire(t *testing.T) {
 	}
 }
 
-// TestInvWireErrors performs negative tests against wire encode and decode
+// TestInvWireErrors performs negative tests against bmwire.encode and decode
 // of MsgInv to confirm error paths work correctly.
 func TestInvWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	wireErr := &wire.MessageError{}
+	pver := bmwire.ProtocolVersion
+	wireErr := &bmwire.MessageError{}
 
 	// Block 203707 hash.
 	hashStr := "3264bc2ac36a60840790ba1d475d01367e7c723da941069e9dc"
-	blockHash, err := wire.NewShaHashFromStr(hashStr)
+	blockHash, err := bmwire.NewShaHashFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(wire.InvTypeBlock, blockHash)
+	iv := bmwire.NewInvVect(blockHash)
 
 	// Base inv message used to induce errors.
-	baseInv := wire.NewMsgInv()
+	baseInv := bmwire.NewMsgInv()
 	baseInv.AddInvVect(iv)
 	baseInvEncoded := []byte{
 		0x02,                   // Varint for number of inv vectors
@@ -261,8 +261,8 @@ func TestInvWireErrors(t *testing.T) {
 
 	// Inv message that forces an error by having more than the max allowed
 	// inv vectors.
-	maxInv := wire.NewMsgInv()
-	for i := 0; i < wire.MaxInvPerMsg; i++ {
+	maxInv := bmwire.NewMsgInv()
+	for i := 0; i < bmwire.MaxInvPerMsg; i++ {
 		maxInv.AddInvVect(iv)
 	}
 	maxInv.InvList = append(maxInv.InvList, iv)
@@ -271,12 +271,12 @@ func TestInvWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgInv // Value to encode
-		buf      []byte       // Wire encoding
-		pver     uint32       // Protocol version for wire encoding
-		max      int          // Max size of fixed buffer to induce errors
-		writeErr error        // Expected write error
-		readErr  error        // Expected read error
+		in       *bmwire.MsgInv // Value to encode
+		buf      []byte         // Wire encoding
+		pver     uint32         // Protocol version for bmwire.encoding
+		max      int            // Max size of fixed buffer to induce errors
+		writeErr error          // Expected write error
+		readErr  error          // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in inventory vector count
@@ -289,7 +289,7 @@ func TestInvWireErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode to wire format.
+		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
 		err := test.in.BtcEncode(w, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
@@ -298,9 +298,9 @@ func TestInvWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
+		// For errors which are not of type bmwire.MessageError, check
 		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		if _, ok := err.(*bmwire.MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -308,8 +308,8 @@ func TestInvWireErrors(t *testing.T) {
 			}
 		}
 
-		// Decode from wire format.
-		var msg wire.MsgInv
+		// Decode from bmwire.format.
+		var msg bmwire.MsgInv
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -318,9 +318,9 @@ func TestInvWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
+		// For errors which are not of type bmwire.MessageError, check
 		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		if _, ok := err.(*bmwire.MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)

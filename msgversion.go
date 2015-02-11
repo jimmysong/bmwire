@@ -17,7 +17,7 @@ import (
 // version message (MsgVersion).
 const MaxUserAgentLen = 2000
 
-// DefaultUserAgent for wire in the stack
+// DefaultUserAgent for bmwire.in the stack
 const DefaultUserAgent = "/btcwire:0.2.0/"
 
 // MsgVersion implements the Message interface and represents a bitcoin version
@@ -34,7 +34,7 @@ type MsgVersion struct {
 	// Bitfield which identifies the enabled services.
 	Services ServiceFlag
 
-	// Time the message was generated.  This is encoded as an int64 on the wire.
+	// Time the message was generated.  This is encoded as an int64 on the bmwire.
 	Timestamp time.Time
 
 	// Address of the remote peer.
@@ -48,7 +48,7 @@ type MsgVersion struct {
 	Nonce uint64
 
 	// The user agent that generated messsage.  This is a encoded as a varString
-	// on the wire.  This has a max length of MaxUserAgentLen.
+	// on the bmwire.  This has a max length of MaxUserAgentLen.
 	UserAgent string
 
 	// The stream numbers of interest.
@@ -194,8 +194,7 @@ func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgVersion returns a new bitcoin version message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
-	lastBlock int32) *MsgVersion {
+func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64) *MsgVersion {
 
 	s := make([]uint64, 1)
 	s[0] = 1
@@ -217,8 +216,7 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64,
 // NewMsgVersionFromConn is a convenience function that extracts the remote
 // and local address from conn and returns a new bitcoin version message that
 // conforms to the Message interface.  See NewMsgVersion.
-func NewMsgVersionFromConn(conn net.Conn, nonce uint64,
-	lastBlock int32) (*MsgVersion, error) {
+func NewMsgVersionFromConn(conn net.Conn, nonce uint64) (*MsgVersion, error) {
 
 	// Don't assume any services until we know otherwise.
 	lna, err := NewNetAddress(conn.LocalAddr(), 0)
@@ -232,7 +230,7 @@ func NewMsgVersionFromConn(conn net.Conn, nonce uint64,
 		return nil, err
 	}
 
-	return NewMsgVersion(lna, rna, nonce, lastBlock), nil
+	return NewMsgVersion(lna, rna, nonce), nil
 }
 
 // validateUserAgent checks userAgent length against MaxUserAgentLen

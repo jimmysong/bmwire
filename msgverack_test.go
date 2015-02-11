@@ -15,11 +15,11 @@ import (
 
 // TestVerAck tests the MsgVerAck API.
 func TestVerAck(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := bmwire.ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "verack"
-	msg := wire.NewMsgVerAck()
+	msg := bmwire.NewMsgVerAck()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgVerAck: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -37,24 +37,24 @@ func TestVerAck(t *testing.T) {
 	return
 }
 
-// TestVerAckWire tests the MsgVerAck wire encode and decode for various
+// TestVerAckWire tests the MsgVerAck bmwire.encode and decode for various
 // protocol versions.
 func TestVerAckWire(t *testing.T) {
-	msgVerAck := wire.NewMsgVerAck()
+	msgVerAck := bmwire.NewMsgVerAck()
 	msgVerAckEncoded := []byte{}
 
 	tests := []struct {
-		in   *wire.MsgVerAck // Message to encode
-		out  *wire.MsgVerAck // Expected decoded message
+		in   *bmwire.MsgVerAck // Message to encode
+		out  *bmwire.MsgVerAck // Expected decoded message
 		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for wire encoding
+		pver uint32          // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version.
 		{
 			msgVerAck,
 			msgVerAck,
 			msgVerAckEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version.
@@ -62,7 +62,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAck,
 			msgVerAckEncoded,
-			wire.BIP0035Version,
+			bmwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version.
@@ -70,7 +70,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAck,
 			msgVerAckEncoded,
-			wire.BIP0031Version,
+			bmwire.BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -78,7 +78,7 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAck,
 			msgVerAckEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -86,13 +86,13 @@ func TestVerAckWire(t *testing.T) {
 			msgVerAck,
 			msgVerAck,
 			msgVerAckEncoded,
-			wire.MultipleAddressVersion,
+			bmwire.MultipleAddressVersion,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode the message to wire format.
+		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
 		err := test.in.BtcEncode(&buf, test.pver)
 		if err != nil {
@@ -105,8 +105,8 @@ func TestVerAckWire(t *testing.T) {
 			continue
 		}
 
-		// Decode the message from wire format.
-		var msg wire.MsgVerAck
+		// Decode the message from bmwire.format.
+		var msg bmwire.MsgVerAck
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

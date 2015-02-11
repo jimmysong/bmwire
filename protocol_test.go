@@ -13,11 +13,11 @@ import (
 // TestServiceFlagStringer tests the stringized output for service flag types.
 func TestServiceFlagStringer(t *testing.T) {
 	tests := []struct {
-		in   wire.ServiceFlag
+		in   bmwire.ServiceFlag
 		want string
 	}{
 		{0, "0x0"},
-		{wire.SFNodeNetwork, "SFNodeNetwork"},
+		{bmwire.SFNodeNetwork, "SFNodeNetwork"},
 		{0xffffffff, "SFNodeNetwork|0xfffffffe"},
 	}
 
@@ -35,13 +35,10 @@ func TestServiceFlagStringer(t *testing.T) {
 // TestBitcoinNetStringer tests the stringized output for bitcoin net types.
 func TestBitcoinNetStringer(t *testing.T) {
 	tests := []struct {
-		in   wire.BitcoinNet
+		in   bmwire.BitcoinNet
 		want string
 	}{
-		{wire.MainNet, "MainNet"},
-		{wire.TestNet, "TestNet"},
-		{wire.TestNet3, "TestNet3"},
-		{wire.SimNet, "SimNet"},
+		{bmwire.MainNet, "MainNet"},
 		{0xffffffff, "Unknown BitcoinNet (4294967295)"},
 	}
 

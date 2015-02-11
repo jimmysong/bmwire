@@ -26,7 +26,7 @@ func TestNetAddress(t *testing.T) {
 		IP:   ip,
 		Port: port,
 	}
-	na, err := wire.NewNetAddress(tcpAddr, 0)
+	na, err := bmwire.NewNetAddress(tcpAddr, 0)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
@@ -43,24 +43,24 @@ func TestNetAddress(t *testing.T) {
 		t.Errorf("NetNetAddress: wrong services - got %v, want %v",
 			na.Services, 0)
 	}
-	if na.HasService(wire.SFNodeNetwork) {
+	if na.HasService(bmwire.SFNodeNetwork) {
 		t.Errorf("HasService: SFNodeNetwork service is set")
 	}
 
 	// Ensure adding the full service node flag works.
-	na.AddService(wire.SFNodeNetwork)
-	if na.Services != wire.SFNodeNetwork {
+	na.AddService(bmwire.SFNodeNetwork)
+	if na.Services != bmwire.SFNodeNetwork {
 		t.Errorf("AddService: wrong services - got %v, want %v",
-			na.Services, wire.SFNodeNetwork)
+			na.Services, bmwire.SFNodeNetwork)
 	}
-	if !na.HasService(wire.SFNodeNetwork) {
+	if !na.HasService(bmwire.SFNodeNetwork) {
 		t.Errorf("HasService: SFNodeNetwork service not set")
 	}
 
 	// Ensure max payload is expected value for latest protocol version.
-	pver := wire.ProtocolVersion
+	pver := bmwire.ProtocolVersion
 	wantPayload := uint32(30)
-	maxPayload := wire.TstMaxNetAddressPayload(wire.ProtocolVersion)
+	maxPayload := bmwire.TstMaxNetAddressPayload(bmwire.ProtocolVersion)
 	if maxPayload != wantPayload {
 		t.Errorf("maxNetAddressPayload: wrong max payload length for "+
 			"protocol version %d - got %v, want %v", pver,
@@ -69,9 +69,9 @@ func TestNetAddress(t *testing.T) {
 
 	// Protocol version before NetAddressTimeVersion when timestamp was
 	// added.  Ensure max payload is expected value for it.
-	pver = wire.NetAddressTimeVersion - 1
+	pver = bmwire.NetAddressTimeVersion - 1
 	wantPayload = 26
-	maxPayload = wire.TstMaxNetAddressPayload(pver)
+	maxPayload = bmwire.TstMaxNetAddressPayload(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("maxNetAddressPayload: wrong max payload length for "+
 			"protocol version %d - got %v, want %v", pver,
@@ -80,20 +80,20 @@ func TestNetAddress(t *testing.T) {
 
 	// Check for expected failure on wrong address type.
 	udpAddr := &net.UDPAddr{}
-	_, err = wire.NewNetAddress(udpAddr, 0)
-	if err != wire.ErrInvalidNetAddr {
+	_, err = bmwire.NewNetAddress(udpAddr, 0)
+	if err != bmwire.ErrInvalidNetAddr {
 		t.Errorf("NewNetAddress: expected error not received - "+
-			"got %v, want %v", err, wire.ErrInvalidNetAddr)
+			"got %v, want %v", err, bmwire.ErrInvalidNetAddr)
 	}
 }
 
-// TestNetAddressWire tests the NetAddress wire encode and decode for various
+// TestNetAddressWire tests the NetAddress bmwire.encode and decode for various
 // protocol versions and timestamp flag combinations.
 func TestNetAddressWire(t *testing.T) {
 	// baseNetAddr is used in the various tests as a baseline NetAddress.
-	baseNetAddr := wire.NetAddress{
+	baseNetAddr := bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
@@ -102,7 +102,7 @@ func TestNetAddressWire(t *testing.T) {
 	baseNetAddrNoTS := baseNetAddr
 	baseNetAddrNoTS.Timestamp = time.Time{}
 
-	// baseNetAddrEncoded is the wire encoded bytes of baseNetAddr.
+	// baseNetAddrEncoded is the bmwire.encoded bytes of baseNetAddr.
 	baseNetAddrEncoded := []byte{
 		0x29, 0xab, 0x5f, 0x49, // Timestamp
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
@@ -111,7 +111,7 @@ func TestNetAddressWire(t *testing.T) {
 		0x20, 0x8d, // Port 8333 in big-endian
 	}
 
-	// baseNetAddrNoTSEncoded is the wire encoded bytes of baseNetAddrNoTS.
+	// baseNetAddrNoTSEncoded is the bmwire.encoded bytes of baseNetAddrNoTS.
 	baseNetAddrNoTSEncoded := []byte{
 		// No timestamp
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
@@ -121,11 +121,11 @@ func TestNetAddressWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   wire.NetAddress // NetAddress to encode
-		out  wire.NetAddress // Expected decoded NetAddress
+		in   bmwire.NetAddress // NetAddress to encode
+		out  bmwire.NetAddress // Expected decoded NetAddress
 		ts   bool            // Include timestamp?
 		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for wire encoding
+		pver uint32          // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version without ts flag.
 		{
@@ -133,7 +133,7 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddrNoTS,
 			false,
 			baseNetAddrNoTSEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with ts flag.
@@ -142,7 +142,7 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddr,
 			true,
 			baseNetAddrEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion without ts flag.
@@ -151,7 +151,7 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddrNoTS,
 			false,
 			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion with ts flag.
@@ -160,7 +160,7 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddr,
 			true,
 			baseNetAddrEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version NetAddressTimeVersion-1 without ts flag.
@@ -169,7 +169,7 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddrNoTS,
 			false,
 			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion - 1,
+			bmwire.NetAddressTimeVersion - 1,
 		},
 
 		// Protocol version NetAddressTimeVersion-1 with timestamp.
@@ -181,15 +181,15 @@ func TestNetAddressWire(t *testing.T) {
 			baseNetAddrNoTS,
 			true,
 			baseNetAddrNoTSEncoded,
-			wire.NetAddressTimeVersion - 1,
+			bmwire.NetAddressTimeVersion - 1,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode to wire format.
+		// Encode to bmwire.format.
 		var buf bytes.Buffer
-		err := wire.TstWriteNetAddress(&buf, test.pver, &test.in, test.ts)
+		err := bmwire.TstWriteNetAddress(&buf, test.pver, &test.in, test.ts)
 		if err != nil {
 			t.Errorf("writeNetAddress #%d error %v", i, err)
 			continue
@@ -200,10 +200,10 @@ func TestNetAddressWire(t *testing.T) {
 			continue
 		}
 
-		// Decode the message from wire format.
-		var na wire.NetAddress
+		// Decode the message from bmwire.format.
+		var na bmwire.NetAddress
 		rbuf := bytes.NewReader(test.buf)
-		err = wire.TstReadNetAddress(rbuf, test.pver, &na, test.ts)
+		err = bmwire.TstReadNetAddress(rbuf, test.pver, &na, test.ts)
 		if err != nil {
 			t.Errorf("readNetAddress #%d error %v", i, err)
 			continue
@@ -216,24 +216,24 @@ func TestNetAddressWire(t *testing.T) {
 	}
 }
 
-// TestNetAddressWireErrors performs negative tests against wire encode and
+// TestNetAddressWireErrors performs negative tests against bmwire.encode and
 // decode NetAddress to confirm error paths work correctly.
 func TestNetAddressWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	pverNAT := wire.NetAddressTimeVersion - 1
+	pver := bmwire.ProtocolVersion
+	pverNAT := bmwire.NetAddressTimeVersion - 1
 
 	// baseNetAddr is used in the various tests as a baseline NetAddress.
-	baseNetAddr := wire.NetAddress{
+	baseNetAddr := bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
 
 	tests := []struct {
-		in       *wire.NetAddress // Value to encode
+		in       *bmwire.NetAddress // Value to encode
 		buf      []byte           // Wire encoding
-		pver     uint32           // Protocol version for wire encoding
+		pver     uint32           // Protocol version for bmwire.encoding
 		ts       bool             // Include timestamp flag
 		max      int              // Max size of fixed buffer to induce errors
 		writeErr error            // Expected write error
@@ -272,19 +272,19 @@ func TestNetAddressWireErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode to wire format.
+		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
-		err := wire.TstWriteNetAddress(w, test.pver, test.in, test.ts)
+		err := bmwire.TstWriteNetAddress(w, test.pver, test.in, test.ts)
 		if err != test.writeErr {
 			t.Errorf("writeNetAddress #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
 			continue
 		}
 
-		// Decode from wire format.
-		var na wire.NetAddress
+		// Decode from bmwire.format.
+		var na bmwire.NetAddress
 		r := newFixedReader(test.max, test.buf)
-		err = wire.TstReadNetAddress(r, test.pver, &na, test.ts)
+		err = bmwire.TstReadNetAddress(r, test.pver, &na, test.ts)
 		if err != test.readErr {
 			t.Errorf("readNetAddress #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)

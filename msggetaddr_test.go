@@ -15,11 +15,11 @@ import (
 
 // TestGetAddr tests the MsgGetAddr API.
 func TestGetAddr(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := bmwire.ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "getaddr"
-	msg := wire.NewMsgGetAddr()
+	msg := bmwire.NewMsgGetAddr()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgGetAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -38,24 +38,24 @@ func TestGetAddr(t *testing.T) {
 	return
 }
 
-// TestGetAddrWire tests the MsgGetAddr wire encode and decode for various
+// TestGetAddrWire tests the MsgGetAddr bmwire.encode and decode for various
 // protocol versions.
 func TestGetAddrWire(t *testing.T) {
-	msgGetAddr := wire.NewMsgGetAddr()
+	msgGetAddr := bmwire.NewMsgGetAddr()
 	msgGetAddrEncoded := []byte{}
 
 	tests := []struct {
-		in   *wire.MsgGetAddr // Message to encode
-		out  *wire.MsgGetAddr // Expected decoded message
+		in   *bmwire.MsgGetAddr // Message to encode
+		out  *bmwire.MsgGetAddr // Expected decoded message
 		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for wire encoding
+		pver uint32           // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version.
 		{
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Protocol version BIP0035Version.
@@ -63,7 +63,7 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.BIP0035Version,
+			bmwire.BIP0035Version,
 		},
 
 		// Protocol version BIP0031Version.
@@ -71,7 +71,7 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.BIP0031Version,
+			bmwire.BIP0031Version,
 		},
 
 		// Protocol version NetAddressTimeVersion.
@@ -79,7 +79,7 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.NetAddressTimeVersion,
+			bmwire.NetAddressTimeVersion,
 		},
 
 		// Protocol version MultipleAddressVersion.
@@ -87,13 +87,13 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			wire.MultipleAddressVersion,
+			bmwire.MultipleAddressVersion,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode the message to wire format.
+		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
 		err := test.in.BtcEncode(&buf, test.pver)
 		if err != nil {
@@ -106,8 +106,8 @@ func TestGetAddrWire(t *testing.T) {
 			continue
 		}
 
-		// Decode the message from wire format.
-		var msg wire.MsgGetAddr
+		// Decode the message from bmwire.format.
+		var msg bmwire.MsgGetAddr
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

@@ -10,7 +10,7 @@ import (
 	"github.com/jimmysong/bmwire"
 )
 
-// fakeMessage implements the wire.Message interface and is used to force
+// fakeMessage implements the bmwire.Message interface and is used to force
 // encode errors in messages.
 type fakeMessage struct {
 	command        string
@@ -19,7 +19,7 @@ type fakeMessage struct {
 	forceLenErr    bool
 }
 
-// BtcDecode doesn't do anything.  It just satisfies the wire.Message
+// BtcDecode doesn't do anything.  It just satisfies the bmwire.Message
 // interface.
 func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
@@ -27,10 +27,10 @@ func (msg *fakeMessage) BtcDecode(r io.Reader, pver uint32) error {
 
 // BtcEncode writes the payload field of the fake message or forces an error
 // if the forceEncodeErr flag of the fake message is set.  It also satisfies the
-// wire.Message interface.
+// bmwire.Message interface.
 func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32) error {
 	if msg.forceEncodeErr {
-		err := &wire.MessageError{
+		err := &bmwire.MessageError{
 			Func:        "fakeMessage.BtcEncode",
 			Description: "intentional error",
 		}
@@ -42,14 +42,14 @@ func (msg *fakeMessage) BtcEncode(w io.Writer, pver uint32) error {
 }
 
 // Command returns the command field of the fake message and satisfies the
-// wire.Message interface.
+// bmwire.Message interface.
 func (msg *fakeMessage) Command() string {
 	return msg.command
 }
 
 // MaxPayloadLength returns the length of the payload field of fake message
 // or a smaller value if the forceLenErr flag of the fake message is set.  It
-// satisfies the wire.Message interface.
+// satisfies the bmwire.Message interface.
 func (msg *fakeMessage) MaxPayloadLength(pver uint32) uint32 {
 	lenp := uint32(len(msg.payload))
 	if msg.forceLenErr {

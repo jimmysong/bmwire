@@ -26,13 +26,15 @@ const MaxMessagePayload = (1024 * 1024 * 32) // 32MB
 
 // Commands used in bitcoin message headers which describe the type of message.
 const (
-	CmdVersion     = "version"
-	CmdVerAck      = "verack"
-	CmdGetAddr     = "getaddr"
-	CmdAddr        = "addr"
+	CmdVersion = "version"
+	CmdVerAck  = "verack"
+	CmdGetAddr = "getaddr"
+	CmdAddr    = "addr"
+	CmdInv     = "inv"
+	CmdGetData = "getdata"
+	CmdObject  = "object"
+
 	CmdGetBlocks   = "getblocks"
-	CmdInv         = "inv"
-	CmdGetData     = "getdata"
 	CmdNotFound    = "notfound"
 	CmdBlock       = "block"
 	CmdTx          = "tx"
@@ -77,56 +79,14 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdAddr:
 		msg = &MsgAddr{}
 
-	case CmdGetBlocks:
-		msg = &MsgGetBlocks{}
-
-	case CmdBlock:
-		msg = &MsgBlock{}
-
 	case CmdInv:
 		msg = &MsgInv{}
 
 	case CmdGetData:
 		msg = &MsgGetData{}
 
-	case CmdNotFound:
-		msg = &MsgNotFound{}
-
-	case CmdTx:
-		msg = &MsgTx{}
-
-	case CmdPing:
-		msg = &MsgPing{}
-
-	case CmdPong:
-		msg = &MsgPong{}
-
-	case CmdGetHeaders:
-		msg = &MsgGetHeaders{}
-
-	case CmdHeaders:
-		msg = &MsgHeaders{}
-
-	case CmdAlert:
-		msg = &MsgAlert{}
-
-	case CmdMemPool:
-		msg = &MsgMemPool{}
-
-	case CmdFilterAdd:
-		msg = &MsgFilterAdd{}
-
-	case CmdFilterClear:
-		msg = &MsgFilterClear{}
-
-	case CmdFilterLoad:
-		msg = &MsgFilterLoad{}
-
-	case CmdMerkleBlock:
-		msg = &MsgMerkleBlock{}
-
-	case CmdReject:
-		msg = &MsgReject{}
+	case CmdObject:
+		msg = &MsgObject{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
@@ -283,6 +243,7 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 		totalBytes += n
 		return totalBytes, nil, nil, err
 	}
+
 	totalBytes += n
 
 	// Enforce maximum message payload.
@@ -350,6 +311,7 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
 	// MsgVersion BtcDecode function requires it.
 	pr := bytes.NewBuffer(payload)
+
 	err = msg.BtcDecode(pr, pver)
 	if err != nil {
 		return totalBytes, nil, nil, err

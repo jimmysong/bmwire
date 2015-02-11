@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jimmysong/bmwire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/jimmysong/bmwire"
 )
 
 // TestAddr tests the MsgAddr API.
 func TestAddr(t *testing.T) {
-	pver := wire.ProtocolVersion
+	pver := bmwire.ProtocolVersion
 
 	// Ensure the command is expected value.
 	wantCmd := "addr"
-	msg := wire.NewMsgAddr()
+	msg := bmwire.NewMsgAddr()
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgAddr: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -40,7 +40,7 @@ func TestAddr(t *testing.T) {
 
 	// Ensure NetAddresses are added properly.
 	tcpAddr := &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333}
-	na, err := wire.NewNetAddress(tcpAddr, wire.SFNodeNetwork)
+	na, err := bmwire.NewNetAddress(tcpAddr, bmwire.SFNodeNetwork)
 	if err != nil {
 		t.Errorf("NewNetAddress: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestAddr(t *testing.T) {
 
 	// Ensure adding more than the max allowed addresses per message returns
 	// error.
-	for i := 0; i < wire.MaxAddrPerMsg+1; i++ {
+	for i := 0; i < bmwire.MaxAddrPerMsg+1; i++ {
 		err = msg.AddAddress(na)
 	}
 	if err == nil {
@@ -79,7 +79,7 @@ func TestAddr(t *testing.T) {
 	// Ensure max payload is expected value for protocol versions before
 	// timestamp was added to NetAddress.
 	// Num addresses (varInt) + max allowed addresses.
-	pver = wire.NetAddressTimeVersion - 1
+	pver = bmwire.NetAddressTimeVersion - 1
 	wantPayload = uint32(26009)
 	maxPayload = msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
@@ -91,7 +91,7 @@ func TestAddr(t *testing.T) {
 	// Ensure max payload is expected value for protocol versions before
 	// multiple addresses were allowed.
 	// Num addresses (varInt) + a single net addresses.
-	pver = wire.MultipleAddressVersion - 1
+	pver = bmwire.MultipleAddressVersion - 1
 	wantPayload = uint32(35)
 	maxPayload = msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
@@ -103,31 +103,31 @@ func TestAddr(t *testing.T) {
 	return
 }
 
-// TestAddrWire tests the MsgAddr wire encode and decode for various numbers
+// TestAddrWire tests the MsgAddr bmwire.encode and decode for various numbers
 // of addreses and protocol versions.
 func TestAddrWire(t *testing.T) {
 	// A couple of NetAddresses to use for testing.
-	na := &wire.NetAddress{
+	na := &bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
-	na2 := &wire.NetAddress{
+	na2 := &bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8334,
 	}
 
 	// Empty address message.
-	noAddr := wire.NewMsgAddr()
+	noAddr := bmwire.NewMsgAddr()
 	noAddrEncoded := []byte{
 		0x00, // Varint for number of addresses
 	}
 
 	// Address message with multiple addresses.
-	multiAddr := wire.NewMsgAddr()
+	multiAddr := bmwire.NewMsgAddr()
 	multiAddr.AddAddresses(na, na2)
 	multiAddrEncoded := []byte{
 		0x02,                   // Varint for number of addresses
@@ -145,17 +145,17 @@ func TestAddrWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *wire.MsgAddr // Message to encode
-		out  *wire.MsgAddr // Expected decoded message
-		buf  []byte        // Wire encoding
-		pver uint32        // Protocol version for wire encoding
+		in   *bmwire.MsgAddr // Message to encode
+		out  *bmwire.MsgAddr // Expected decoded message
+		buf  []byte          // Wire encoding
+		pver uint32          // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version with no addresses.
 		{
 			noAddr,
 			noAddr,
 			noAddrEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple addresses.
@@ -163,7 +163,7 @@ func TestAddrWire(t *testing.T) {
 			multiAddr,
 			multiAddr,
 			multiAddrEncoded,
-			wire.ProtocolVersion,
+			bmwire.ProtocolVersion,
 		},
 
 		// Protocol version MultipleAddressVersion-1 with no addresses.
@@ -171,13 +171,13 @@ func TestAddrWire(t *testing.T) {
 			noAddr,
 			noAddr,
 			noAddrEncoded,
-			wire.MultipleAddressVersion - 1,
+			bmwire.MultipleAddressVersion - 1,
 		},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode the message to wire format.
+		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
 		err := test.in.BtcEncode(&buf, test.pver)
 		if err != nil {
@@ -190,8 +190,8 @@ func TestAddrWire(t *testing.T) {
 			continue
 		}
 
-		// Decode the message from wire format.
-		var msg wire.MsgAddr
+		// Decode the message from bmwire.format.
+		var msg bmwire.MsgAddr
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {
@@ -206,29 +206,29 @@ func TestAddrWire(t *testing.T) {
 	}
 }
 
-// TestAddrWireErrors performs negative tests against wire encode and decode
+// TestAddrWireErrors performs negative tests against bmwire.encode and decode
 // of MsgAddr to confirm error paths work correctly.
 func TestAddrWireErrors(t *testing.T) {
-	pver := wire.ProtocolVersion
-	pverMA := wire.MultipleAddressVersion
-	wireErr := &wire.MessageError{}
+	pver := bmwire.ProtocolVersion
+	pverMA := bmwire.MultipleAddressVersion
+	wireErr := &bmwire.MessageError{}
 
 	// A couple of NetAddresses to use for testing.
-	na := &wire.NetAddress{
+	na := &bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	}
-	na2 := &wire.NetAddress{
+	na2 := &bmwire.NetAddress{
 		Timestamp: time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST
-		Services:  wire.SFNodeNetwork,
+		Services:  bmwire.SFNodeNetwork,
 		IP:        net.ParseIP("192.168.0.1"),
 		Port:      8334,
 	}
 
 	// Address message with multiple addresses.
-	baseAddr := wire.NewMsgAddr()
+	baseAddr := bmwire.NewMsgAddr()
 	baseAddr.AddAddresses(na, na2)
 	baseAddrEncoded := []byte{
 		0x02,                   // Varint for number of addresses
@@ -247,8 +247,8 @@ func TestAddrWireErrors(t *testing.T) {
 
 	// Message that forces an error by having more than the max allowed
 	// addresses.
-	maxAddr := wire.NewMsgAddr()
-	for i := 0; i < wire.MaxAddrPerMsg; i++ {
+	maxAddr := bmwire.NewMsgAddr()
+	for i := 0; i < bmwire.MaxAddrPerMsg; i++ {
 		maxAddr.AddAddress(na)
 	}
 	maxAddr.AddrList = append(maxAddr.AddrList, na)
@@ -257,12 +257,12 @@ func TestAddrWireErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		in       *wire.MsgAddr // Value to encode
-		buf      []byte        // Wire encoding
-		pver     uint32        // Protocol version for wire encoding
-		max      int           // Max size of fixed buffer to induce errors
-		writeErr error         // Expected write error
-		readErr  error         // Expected read error
+		in       *bmwire.MsgAddr // Value to encode
+		buf      []byte          // Wire encoding
+		pver     uint32          // Protocol version for bmwire.encoding
+		max      int             // Max size of fixed buffer to induce errors
+		writeErr error           // Expected write error
+		readErr  error           // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in addresses count
@@ -278,7 +278,7 @@ func TestAddrWireErrors(t *testing.T) {
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
-		// Encode to wire format.
+		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
 		err := test.in.BtcEncode(w, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
@@ -287,9 +287,9 @@ func TestAddrWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
+		// For errors which are not of type bmwire.MessageError, check
 		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		if _, ok := err.(*bmwire.MessageError); !ok {
 			if err != test.writeErr {
 				t.Errorf("BtcEncode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.writeErr)
@@ -297,8 +297,8 @@ func TestAddrWireErrors(t *testing.T) {
 			}
 		}
 
-		// Decode from wire format.
-		var msg wire.MsgAddr
+		// Decode from bmwire.format.
+		var msg bmwire.MsgAddr
 		r := newFixedReader(test.max, test.buf)
 		err = msg.BtcDecode(r, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -307,9 +307,9 @@ func TestAddrWireErrors(t *testing.T) {
 			continue
 		}
 
-		// For errors which are not of type wire.MessageError, check
+		// For errors which are not of type bmwire.MessageError, check
 		// them for equality.
-		if _, ok := err.(*wire.MessageError); !ok {
+		if _, ok := err.(*bmwire.MessageError); !ok {
 			if err != test.readErr {
 				t.Errorf("BtcDecode #%d wrong error got: %v, "+
 					"want: %v", i, err, test.readErr)

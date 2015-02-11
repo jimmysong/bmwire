@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 /*
-This test file is part of the wire package rather than than the wire_test
+This test file is part of the bmwire.package rather than than the bmwire.test
 package so it can bridge access to the internals to properly test cases which
 are either not possible or can't reliably be tested via the public interface.
 The functions are only exported while the tests are being run.
@@ -13,24 +13,6 @@ package bmwire
 
 import (
 	"io"
-)
-
-const (
-	// MaxTxPerBlock makes the internal maxTxPerBlock constant available to
-	// the test package.
-	MaxTxPerBlock = maxTxPerBlock
-
-	// MaxFlagsPerMerkleBlock makes the internal maxFlagsPerMerkleBlock
-	// constant available to the test package.
-	MaxFlagsPerMerkleBlock = maxFlagsPerMerkleBlock
-
-	// MaxCountSetCancel makes the internal maxCountSetCancel constant
-	// available to the test package.
-	MaxCountSetCancel = maxCountSetCancel
-
-	// MaxCountSetSubVer makes the internal maxCountSetSubVer constant
-	// available to the test package.
-	MaxCountSetSubVer = maxCountSetSubVer
 )
 
 // TstRandomUint64 makes the internal randomUint64 function available to the
@@ -115,16 +97,4 @@ func TstReadInvVect(r io.Reader, pver uint32, iv *InvVect) error {
 // test package.
 func TstWriteInvVect(w io.Writer, pver uint32, iv *InvVect) error {
 	return writeInvVect(w, pver, iv)
-}
-
-// TstReadBlockHeader makes the internal readBlockHeader function available to
-// the test package.
-func TstReadBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	return readBlockHeader(r, pver, bh)
-}
-
-// TstWriteBlockHeader makes the internal writeBlockHeader function available to
-// the test package.
-func TstWriteBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
-	return writeBlockHeader(w, pver, bh)
 }
