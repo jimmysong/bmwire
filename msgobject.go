@@ -111,3 +111,20 @@ func (msg *MsgObject) MaxPayloadLength(pver uint32) uint32 {
 func (msg *MsgObject) String() string {
 	return fmt.Sprintf("msgobject: %d %s %s %d %d %x", msg.Nonce, msg.ExpiresTime, obStrings[msg.ObjectType], msg.Version, msg.StreamNumber, msg.Payload)
 }
+
+// NewMsgObject returns a new object message that conforms to the
+// Message interface using the passed parameters and defaults for the remaining
+// fields.
+func NewMsgObject(nonce uint64, expires time.Time, objType ObjectType, version, streamNumber uint64, payload []byte) *MsgObject {
+
+	// Limit the timestamp to one second precision since the protocol
+	// doesn't support better.
+	return &MsgObject{
+		Nonce:        nonce,
+		ExpiresTime:  expires,
+		ObjectType:   objType,
+		Version:      version,
+		StreamNumber: streamNumber,
+		Payload:      payload,
+	}
+}

@@ -33,22 +33,6 @@ const (
 	CmdInv     = "inv"
 	CmdGetData = "getdata"
 	CmdObject  = "object"
-
-	CmdGetBlocks   = "getblocks"
-	CmdNotFound    = "notfound"
-	CmdBlock       = "block"
-	CmdTx          = "tx"
-	CmdGetHeaders  = "getheaders"
-	CmdHeaders     = "headers"
-	CmdPing        = "ping"
-	CmdPong        = "pong"
-	CmdAlert       = "alert"
-	CmdMemPool     = "mempool"
-	CmdFilterAdd   = "filteradd"
-	CmdFilterClear = "filterclear"
-	CmdFilterLoad  = "filterload"
-	CmdMerkleBlock = "merkleblock"
-	CmdReject      = "reject"
 )
 
 // Message is an interface that describes a bitcoin message.  A type that

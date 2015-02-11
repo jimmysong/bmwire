@@ -28,7 +28,7 @@ func TestGetData(t *testing.T) {
 
 	// Ensure max payload is expected value for latest protocol version.
 	// Num inventory vectors (varInt) + max allowed inventory vectors.
-	wantPayload := uint32(1800009)
+	wantPayload := uint32(1600009)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -101,13 +101,11 @@ func TestGetDataWire(t *testing.T) {
 	MultiInv.AddInvVect(iv)
 	MultiInv.AddInvVect(iv2)
 	MultiInvEncoded := []byte{
-		0x02,                   // Varint for number of inv vectors
-		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
+		0x02, // Varint for number of inv vectors
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
 		0x26, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Block 203707 hash
-		0x01, 0x00, 0x00, 0x00, // InvTypeTx
 		0xf0, 0xfa, 0xcc, 0x7a, 0x48, 0x1b, 0xe7, 0xcf,
 		0x42, 0xbd, 0x7f, 0xe5, 0x4f, 0x2c, 0x2a, 0xf8,
 		0xef, 0x81, 0x9a, 0xdd, 0x93, 0xee, 0x55, 0x98,
@@ -134,70 +132,6 @@ func TestGetDataWire(t *testing.T) {
 			MultiInv,
 			MultiInvEncoded,
 			bmwire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion no inv vectors.
-		{
-			NoInv,
-			NoInv,
-			NoInvEncoded,
-			bmwire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion with multiple inv vectors.
-		{
-			MultiInv,
-			MultiInv,
-			MultiInvEncoded,
-			bmwire.MultipleAddressVersion,
 		},
 	}
 
@@ -251,8 +185,7 @@ func TestGetDataWireErrors(t *testing.T) {
 	baseGetData := bmwire.NewMsgGetData()
 	baseGetData.AddInvVect(iv)
 	baseGetDataEncoded := []byte{
-		0x02,                   // Varint for number of inv vectors
-		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
+		0x02, // Varint for number of inv vectors
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
@@ -267,7 +200,7 @@ func TestGetDataWireErrors(t *testing.T) {
 	}
 	maxGetData.InvList = append(maxGetData.InvList, iv)
 	maxGetDataEncoded := []byte{
-		0xfd, 0x51, 0xc3, // Varint for number of inv vectors (50001)
+		0xfd, 0xc3, 0x51, // Varint for number of inv vectors (50001)
 	}
 
 	tests := []struct {
@@ -294,7 +227,7 @@ func TestGetDataWireErrors(t *testing.T) {
 		err := test.in.BtcEncode(w, test.pver)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("BtcEncode #%d wrong error got: %v, want: %v",
-				i, err, test.writeErr)
+				i, reflect.TypeOf(err), reflect.TypeOf(test.writeErr))
 			continue
 		}
 

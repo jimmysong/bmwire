@@ -96,31 +96,34 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 		return err
 	}
 
-	// Protocol versions >= 106 added a from address, nonce, and user agent
-	// field and they are only considered present if there are bytes
-	// remaining in the message.
-	if buf.Len() > 0 {
-		err = readNetAddress(buf, pver, &msg.AddrMe, false)
-		if err != nil {
-			return err
-		}
+	err = readNetAddress(buf, pver, &msg.AddrMe, false)
+	if err != nil {
+		return err
 	}
-	if buf.Len() > 0 {
-		err = readElement(buf, &msg.Nonce)
-		if err != nil {
-			return err
-		}
+	err = readElement(buf, &msg.Nonce)
+	if err != nil {
+		return err
 	}
-	if buf.Len() > 0 {
-		userAgent, err := readVarString(buf, pver)
+	userAgent, err := readVarString(buf, pver)
+	if err != nil {
+		return err
+	}
+	err = validateUserAgent(userAgent)
+	if err != nil {
+		return err
+	}
+	msg.UserAgent = userAgent
+
+	streamLen, err := readVarInt(buf, pver)
+	if err != nil {
+		return err
+	}
+	msg.StreamNumbers = make([]uint64, int(streamLen))
+	for i := uint64(0); i < streamLen; i++ {
+		msg.StreamNumbers[i], err = readVarInt(buf, pver)
 		if err != nil {
 			return err
 		}
-		err = validateUserAgent(userAgent)
-		if err != nil {
-			return err
-		}
-		msg.UserAgent = userAgent
 	}
 
 	return nil
@@ -160,13 +163,15 @@ func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarInt(w, pver, msg.StreamNumbers[0])
+	err = writeVarInt(w, pver, uint64(len(msg.StreamNumbers)))
 	if err != nil {
 		return err
 	}
-	err = writeVarInt(w, pver, msg.StreamNumbers[0])
-	if err != nil {
-		return err
+	for _, stream := range msg.StreamNumbers {
+		err = writeVarInt(w, pver, stream)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -194,29 +199,26 @@ func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 // NewMsgVersion returns a new bitcoin version message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64) *MsgVersion {
-
-	s := make([]uint64, 1)
-	s[0] = 1
+func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64, streams []uint64) *MsgVersion {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &MsgVersion{
 		ProtocolVersion: int32(3),
-		Services:        1,
+		Services:        0,
 		Timestamp:       time.Unix(time.Now().Unix(), 0),
 		AddrYou:         *you,
 		AddrMe:          *me,
 		Nonce:           nonce,
 		UserAgent:       DefaultUserAgent,
-		StreamNumbers:   s,
+		StreamNumbers:   streams[:],
 	}
 }
 
 // NewMsgVersionFromConn is a convenience function that extracts the remote
 // and local address from conn and returns a new bitcoin version message that
 // conforms to the Message interface.  See NewMsgVersion.
-func NewMsgVersionFromConn(conn net.Conn, nonce uint64) (*MsgVersion, error) {
+func NewMsgVersionFromConn(conn net.Conn, nonce uint64, streams []uint64) (*MsgVersion, error) {
 
 	// Don't assume any services until we know otherwise.
 	lna, err := NewNetAddress(conn.LocalAddr(), 0)
@@ -230,7 +232,7 @@ func NewMsgVersionFromConn(conn net.Conn, nonce uint64) (*MsgVersion, error) {
 		return nil, err
 	}
 
-	return NewMsgVersion(lna, rna, nonce), nil
+	return NewMsgVersion(lna, rna, nonce, streams), nil
 }
 
 // validateUserAgent checks userAgent length against MaxUserAgentLen

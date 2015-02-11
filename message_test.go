@@ -52,13 +52,15 @@ func TestMessage(t *testing.T) {
 		t.Errorf("NewNetAddress: %v", err)
 	}
 	me.Timestamp = time.Time{} // Version message has zero value timestamp.
-	msgVersion := bmwire.NewMsgVersion(me, you, 123123)
-
+	msgVersion := bmwire.NewMsgVersion(me, you, 123123, []uint64{1})
 	msgVerack := bmwire.NewMsgVerAck()
 	msgGetAddr := bmwire.NewMsgGetAddr()
 	msgAddr := bmwire.NewMsgAddr()
 	msgInv := bmwire.NewMsgInv()
 	msgGetData := bmwire.NewMsgGetData()
+	twentyBytes := make([]byte, 20)
+	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
+	msgObject := bmwire.NewMsgObject(83928, expires, bmwire.ObjectTypeGetPubKey, 1, 1, twentyBytes)
 
 	tests := []struct {
 		in     bmwire.Message    // Value to encode
@@ -67,12 +69,13 @@ func TestMessage(t *testing.T) {
 		btcnet bmwire.BitcoinNet // Network to use for bmwire.encoding
 		bytes  int               // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, bmwire.MainNet, 125},
+		{msgVersion, msgVersion, pver, bmwire.MainNet, 122},
 		{msgVerack, msgVerack, pver, bmwire.MainNet, 24},
 		{msgGetAddr, msgGetAddr, pver, bmwire.MainNet, 24},
 		{msgAddr, msgAddr, pver, bmwire.MainNet, 25},
 		{msgInv, msgInv, pver, bmwire.MainNet, 25},
 		{msgGetData, msgGetData, pver, bmwire.MainNet, 25},
+		{msgObject, msgObject, pver, bmwire.MainNet, 66},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -191,12 +194,15 @@ func TestReadMessageWireErrors(t *testing.T) {
 	// contained in the message.  Claim there is two, but don't provide
 	// them.  At the same time, forge the header fields so the message is
 	// otherwise accurate.
-	badMessageBytes := makeHeader(btcnet, "addr", 1, 0xeaadc31c)
+	badMessageBytes := makeHeader(btcnet, "addr", 1, 0xfab848c9)
 	badMessageBytes = append(badMessageBytes, 0x2)
 
 	// Wire encoded bytes for a message which the header claims has 15k
 	// bytes of data to discard.
 	discardBytes := makeHeader(btcnet, "bogus", 15*1024, 0)
+
+	// wrong network bytes
+	wrongNetBytes := makeHeader(0x09090909, "", 0, 0)
 
 	tests := []struct {
 		buf     []byte            // Wire encoding
@@ -216,6 +222,16 @@ func TestReadMessageWireErrors(t *testing.T) {
 			0,
 			io.EOF,
 			0,
+		},
+
+		// Wrong network.  Want MainNet, but giving wrong network.
+		{
+			wrongNetBytes,
+			pver,
+			btcnet,
+			len(wrongNetBytes),
+			&bmwire.MessageError{},
+			24,
 		},
 
 		// Exceed max overall message payload length.

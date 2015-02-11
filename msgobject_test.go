@@ -8,25 +8,29 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jimmysong/bmwire"
 )
 
-// TestVerAck tests the MsgVerAck API.
-func TestVerAck(t *testing.T) {
+// TestObject tests the MsgObject API.
+func TestObject(t *testing.T) {
 	pver := bmwire.ProtocolVersion
 
 	// Ensure the command is expected value.
-	wantCmd := "verack"
-	msg := bmwire.NewMsgVerAck()
+	wantCmd := "object"
+	now := time.Now()
+	twentyBytes := make([]byte, 20)
+	msg := bmwire.NewMsgObject(83928, now, bmwire.ObjectTypeGetPubKey, 1, 1, twentyBytes)
 	if cmd := msg.Command(); cmd != wantCmd {
-		t.Errorf("NewMsgVerAck: wrong command - got %v want %v",
+		t.Errorf("NewMsgObject: wrong command - got %v want %v",
 			cmd, wantCmd)
 	}
 
-	// Ensure max payload is expected value.
-	wantPayload := uint32(0)
+	// Ensure max payload is expected value for latest protocol version.
+	// Num objectentory vectors (varInt) + max allowed objectentory vectors.
+	wantPayload := uint32(100000000)
 	maxPayload := msg.MaxPayloadLength(pver)
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
@@ -37,23 +41,36 @@ func TestVerAck(t *testing.T) {
 	return
 }
 
-// TestVerAckWire tests the MsgVerAck bmwire.encode and decode for various
-// protocol versions.
-func TestVerAckWire(t *testing.T) {
-	msgVerAck := bmwire.NewMsgVerAck()
-	msgVerAckEncoded := []byte{}
+// TestObjectWire tests the MsgObject bmwire.encode and decode for various numbers
+// of objectentory vectors and protocol versions.
+func TestObjectWire(t *testing.T) {
+
+	twentyBytes := make([]byte, 20)
+	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
+	msg := bmwire.NewMsgObject(83928, expires, bmwire.ObjectTypeGetPubKey, 1, 1, twentyBytes)
+
+	ObjectEncoded := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
+		0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit timestamp
+		0x00, 0x00, 0x00, 0x00, // object type (GETPUBKEY)
+		0x01, // object version
+		0x01, // stream number
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, // 20-byte ripemd
+	}
 
 	tests := []struct {
-		in   *bmwire.MsgVerAck // Message to encode
-		out  *bmwire.MsgVerAck // Expected decoded message
+		in   *bmwire.MsgObject // Message to encode
+		out  *bmwire.MsgObject // Expected decoded message
 		buf  []byte            // Wire encoding
 		pver uint32            // Protocol version for bmwire.encoding
 	}{
-		// Latest protocol version.
+		// Latest protocol version with multiple object vectors.
 		{
-			msgVerAck,
-			msgVerAck,
-			msgVerAckEncoded,
+			msg,
+			msg,
+			ObjectEncoded,
 			bmwire.ProtocolVersion,
 		},
 	}
@@ -74,7 +91,7 @@ func TestVerAckWire(t *testing.T) {
 		}
 
 		// Decode the message from bmwire.format.
-		var msg bmwire.MsgVerAck
+		var msg bmwire.MsgObject
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.BtcDecode(rbuf, test.pver)
 		if err != nil {

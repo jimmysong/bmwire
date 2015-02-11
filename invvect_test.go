@@ -13,30 +13,6 @@ import (
 	"github.com/jimmysong/bmwire"
 )
 
-// TestInvVectStringer tests the stringized output for inventory vector types.
-func TestInvTypeStringer(t *testing.T) {
-	tests := []struct {
-		in   bmwire.InvType
-		want string
-	}{
-		{bmwire.InvTypeError, "ERROR"},
-		{bmwire.InvTypeTx, "MSG_TX"},
-		{bmwire.InvTypeBlock, "MSG_BLOCK"},
-		{0xffffffff, "Unknown InvType (4294967295)"},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		result := test.in.String()
-		if result != test.want {
-			t.Errorf("String #%d\n got: %s want: %s", i, result,
-				test.want)
-			continue
-		}
-	}
-
-}
-
 // TestInvVect tests the InvVect API.
 func TestInvVect(t *testing.T) {
 	hash := bmwire.ShaHash{}
@@ -67,7 +43,6 @@ func TestInvVectWire(t *testing.T) {
 
 	// errInvVectEncoded is the bmwire.encoded bytes of errInvVect.
 	errInvVectEncoded := []byte{
-		0x00, 0x00, 0x00, 0x00, // InvTypeError
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -81,7 +56,6 @@ func TestInvVectWire(t *testing.T) {
 
 	// txInvVectEncoded is the bmwire.encoded bytes of txInvVect.
 	txInvVectEncoded := []byte{
-		0x01, 0x00, 0x00, 0x00, // InvTypeTx
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
@@ -95,7 +69,6 @@ func TestInvVectWire(t *testing.T) {
 
 	// blockInvVectEncoded is the bmwire.encoded bytes of blockInvVect.
 	blockInvVectEncoded := []byte{
-		0x02, 0x00, 0x00, 0x00, // InvTypeBlock
 		0xdc, 0xe9, 0x69, 0x10, 0x94, 0xda, 0x23, 0xc7,
 		0xe7, 0x67, 0x13, 0xd0, 0x75, 0xd4, 0xa1, 0x0b,
 		0x79, 0x40, 0x08, 0xa6, 0x36, 0xac, 0xc2, 0x4b,
@@ -130,102 +103,6 @@ func TestInvVectWire(t *testing.T) {
 			blockInvVect,
 			blockInvVectEncoded,
 			bmwire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0035Version block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version BIP0031Version block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version NetAddressTimeVersion block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion error inventory vector.
-		{
-			errInvVect,
-			errInvVect,
-			errInvVectEncoded,
-			bmwire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion tx inventory vector.
-		{
-			txInvVect,
-			txInvVect,
-			txInvVectEncoded,
-			bmwire.MultipleAddressVersion,
-		},
-
-		// Protocol version MultipleAddressVersion block inventory vector.
-		{
-			blockInvVect,
-			blockInvVect,
-			blockInvVectEncoded,
-			bmwire.MultipleAddressVersion,
 		},
 	}
 

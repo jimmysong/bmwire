@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/jimmysong/bmwire"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/jimmysong/bmwire"
 )
 
 // TestGetAddr tests the MsgGetAddr API.
@@ -47,8 +47,8 @@ func TestGetAddrWire(t *testing.T) {
 	tests := []struct {
 		in   *bmwire.MsgGetAddr // Message to encode
 		out  *bmwire.MsgGetAddr // Expected decoded message
-		buf  []byte           // Wire encoding
-		pver uint32           // Protocol version for bmwire.encoding
+		buf  []byte             // Wire encoding
+		pver uint32             // Protocol version for bmwire.encoding
 	}{
 		// Latest protocol version.
 		{
@@ -56,38 +56,6 @@ func TestGetAddrWire(t *testing.T) {
 			msgGetAddr,
 			msgGetAddrEncoded,
 			bmwire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			msgGetAddr,
-			msgGetAddr,
-			msgGetAddrEncoded,
-			bmwire.MultipleAddressVersion,
 		},
 	}
 

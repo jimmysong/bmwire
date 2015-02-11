@@ -76,30 +76,6 @@ func TestAddr(t *testing.T) {
 			"not received")
 	}
 
-	// Ensure max payload is expected value for protocol versions before
-	// timestamp was added to NetAddress.
-	// Num addresses (varInt) + max allowed addresses.
-	pver = bmwire.NetAddressTimeVersion - 1
-	wantPayload = uint32(26009)
-	maxPayload = msg.MaxPayloadLength(pver)
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
-	}
-
-	// Ensure max payload is expected value for protocol versions before
-	// multiple addresses were allowed.
-	// Num addresses (varInt) + a single net addresses.
-	pver = bmwire.MultipleAddressVersion - 1
-	wantPayload = uint32(35)
-	maxPayload = msg.MaxPayloadLength(pver)
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
-	}
-
 	return
 }
 
@@ -131,13 +107,13 @@ func TestAddrWire(t *testing.T) {
 	multiAddr.AddAddresses(na, na2)
 	multiAddrEncoded := []byte{
 		0x02,                   // Varint for number of addresses
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x49, 0x5f, 0xab, 0x29, // Timestamp
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
 		0x20, 0x8d, // Port 8333 in big-endian
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+		0x49, 0x5f, 0xab, 0x29, // Timestamp
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
 		0x20, 0x8e, // Port 8334 in big-endian
@@ -164,14 +140,6 @@ func TestAddrWire(t *testing.T) {
 			multiAddr,
 			multiAddrEncoded,
 			bmwire.ProtocolVersion,
-		},
-
-		// Protocol version MultipleAddressVersion-1 with no addresses.
-		{
-			noAddr,
-			noAddr,
-			noAddrEncoded,
-			bmwire.MultipleAddressVersion - 1,
 		},
 	}
 
@@ -210,7 +178,6 @@ func TestAddrWire(t *testing.T) {
 // of MsgAddr to confirm error paths work correctly.
 func TestAddrWireErrors(t *testing.T) {
 	pver := bmwire.ProtocolVersion
-	pverMA := bmwire.MultipleAddressVersion
 	wireErr := &bmwire.MessageError{}
 
 	// A couple of NetAddresses to use for testing.
@@ -271,9 +238,6 @@ func TestAddrWireErrors(t *testing.T) {
 		{baseAddr, baseAddrEncoded, pver, 1, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max inventory vectors.
 		{maxAddr, maxAddrEncoded, pver, 3, wireErr, wireErr},
-		// Force error with greater than max inventory vectors for
-		// protocol versions before multiple addresses were allowed.
-		{maxAddr, maxAddrEncoded, pverMA - 1, 3, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))

@@ -38,7 +38,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	// Ensure we get the correct data back out.
-	msg := bmwire.NewMsgVersion(me, you, nonce)
+	msg := bmwire.NewMsgVersion(me, you, nonce, []uint64{1})
 	if msg.ProtocolVersion != int32(pver) {
 		t.Errorf("NewMsgVersion: wrong protocol version - got %v, want %v",
 			msg.ProtocolVersion, pver)
@@ -58,6 +58,15 @@ func TestVersion(t *testing.T) {
 	if msg.UserAgent != bmwire.DefaultUserAgent {
 		t.Errorf("NewMsgVersion: wrong user agent - got %v, want %v",
 			msg.UserAgent, bmwire.DefaultUserAgent)
+	}
+	if len(msg.StreamNumbers) != 1 {
+		t.Errorf("NewMsgVersion: wrong number of streams - got %v, want %v",
+			len(msg.StreamNumbers), 1)
+	}
+
+	if msg.StreamNumbers[0] != 1 {
+		t.Errorf("NewMsgVersion: wrong streams - got %v, want %v",
+			msg.StreamNumbers[0], 1)
 	}
 
 	msg.AddUserAgent("myclient", "1.2.3", "optional", "comments")
@@ -90,7 +99,11 @@ func TestVersion(t *testing.T) {
 
 	}
 	if msg.HasService(bmwire.SFNodeNetwork) {
-		t.Errorf("HasService: SFNodeNetwork service is set")
+		t.Errorf("HasService: SFNodeNetwork service is not set")
+	}
+	msg.AddService(bmwire.SFNodeNetwork)
+	if !msg.HasService(bmwire.SFNodeNetwork) {
+		t.Errorf("HasService: SFNodeNetwork service is not set")
 	}
 
 	// Ensure the command is expected value.
@@ -125,7 +138,7 @@ func TestVersion(t *testing.T) {
 
 	// Use a fake connection.
 	conn := &fakeConn{localAddr: tcpAddrMe, remoteAddr: tcpAddrYou}
-	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce)
+	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce, []uint64{1})
 	if err != nil {
 		t.Errorf("NewMsgVersionFromConn: %v", err)
 	}
@@ -145,7 +158,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8333},
 		remoteAddr: tcpAddrYou,
 	}
-	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce)
+	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce, []uint64{1})
 	if err != bmwire.ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, bmwire.ErrInvalidNetAddr)
@@ -156,7 +169,7 @@ func TestVersion(t *testing.T) {
 		localAddr:  tcpAddrMe,
 		remoteAddr: &net.UDPAddr{IP: net.ParseIP("192.168.0.1"), Port: 8333},
 	}
-	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce)
+	msg, err = bmwire.NewMsgVersionFromConn(conn, nonce, []uint64{1})
 	if err != bmwire.ErrInvalidNetAddr {
 		t.Errorf("NewMsgVersionFromConn: expected error not received "+
 			"- got %v, want %v", err, bmwire.ErrInvalidNetAddr)
@@ -170,10 +183,8 @@ func TestVersion(t *testing.T) {
 func TestVersionWire(t *testing.T) {
 	// verRelayTxFalse and verRelayTxFalseEncoded is a version message as of
 	// BIP0037Version with the transaction relay disabled.
-	baseVersionBIP0037Copy := *baseVersionBIP0037
-	verRelayTxFalse := &baseVersionBIP0037Copy
-	verRelayTxFalseEncoded := make([]byte, len(baseVersionBIP0037Encoded))
-	copy(verRelayTxFalseEncoded, baseVersionBIP0037Encoded)
+	verRelayTxFalseEncoded := make([]byte, len(baseVersionEncoded))
+	copy(verRelayTxFalseEncoded, baseVersionEncoded)
 	verRelayTxFalseEncoded[len(verRelayTxFalseEncoded)-1] = 0
 
 	tests := []struct {
@@ -184,60 +195,10 @@ func TestVersionWire(t *testing.T) {
 	}{
 		// Latest protocol version.
 		{
-			baseVersionBIP0037,
-			baseVersionBIP0037,
-			baseVersionBIP0037Encoded,
+			baseVersion,
+			baseVersion,
+			baseVersionEncoded,
 			bmwire.ProtocolVersion,
-		},
-
-		// Protocol version BIP0037Version with relay transactions field
-		// true.
-		{
-			baseVersionBIP0037,
-			baseVersionBIP0037,
-			baseVersionBIP0037Encoded,
-			bmwire.BIP0037Version,
-		},
-
-		// Protocol version BIP0037Version with relay transactions field
-		// false.
-		{
-			verRelayTxFalse,
-			verRelayTxFalse,
-			verRelayTxFalseEncoded,
-			bmwire.BIP0037Version,
-		},
-
-		// Protocol version BIP0035Version.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			bmwire.BIP0035Version,
-		},
-
-		// Protocol version BIP0031Version.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			bmwire.BIP0031Version,
-		},
-
-		// Protocol version NetAddressTimeVersion.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			bmwire.NetAddressTimeVersion,
-		},
-
-		// Protocol version MultipleAddressVersion.
-		{
-			baseVersion,
-			baseVersion,
-			baseVersionEncoded,
-			bmwire.MultipleAddressVersion,
 		},
 	}
 
@@ -279,7 +240,7 @@ func TestVersionWireErrors(t *testing.T) {
 	// because the test data is using bytes encoded with that protocol
 	// version.
 	pver := uint32(60002)
-	wireErr := &bmwire.MessageError{}
+	//	wireErr := &bmwire.MessageError{}
 
 	// Ensure calling MsgVersion.BtcDecode with a non *bytes.Buffer returns
 	// error.
@@ -302,16 +263,16 @@ func TestVersionWireErrors(t *testing.T) {
 		t.Errorf("writeVarInt: error %v", err)
 	}
 
-	// Make a new buffer big enough to hold the base version plus the new
-	// bytes for the bigger varint to hold the new size of the user agent
-	// and the new user agent string.  Then stich it all together.
-	newLen := len(baseVersionEncoded) - len(baseVersion.UserAgent)
-	newLen = newLen + len(newUAVarIntBuf.Bytes()) - 1 + len(newUA)
-	exceedUAVerEncoded := make([]byte, newLen)
-	copy(exceedUAVerEncoded, baseVersionEncoded[0:80])
-	copy(exceedUAVerEncoded[80:], newUAVarIntBuf.Bytes())
-	copy(exceedUAVerEncoded[83:], []byte(newUA))
-	copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
+	// // Make a new buffer big enough to hold the base version plus the new
+	// // bytes for the bigger varint to hold the new size of the user agent
+	// // and the new user agent string.  Then stich it all together.
+	// newLen := len(baseVersionEncoded) - len(baseVersion.UserAgent)
+	// newLen = newLen + len(newUAVarIntBuf.Bytes()) - 1 + len(newUA)
+	// exceedUAVerEncoded := make([]byte, newLen)
+	// copy(exceedUAVerEncoded, baseVersionEncoded[0:80])
+	// copy(exceedUAVerEncoded[80:], newUAVarIntBuf.Bytes())
+	// copy(exceedUAVerEncoded[83:], []byte(newUA))
+	// copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
 
 	tests := []struct {
 		in       *bmwire.MsgVersion // Value to encode
@@ -337,8 +298,6 @@ func TestVersionWireErrors(t *testing.T) {
 		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
 		// Force error in user agent.
 		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
-		// Force error due to user agent too big
-		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -384,98 +343,9 @@ func TestVersionWireErrors(t *testing.T) {
 	}
 }
 
-// TestVersionOptionalFields performs tests to ensure that an encoded version
-// messages that omit optional fields are handled correctly.
-func TestVersionOptionalFields(t *testing.T) {
-	// onlyRequiredVersion is a version message that only contains the
-	// required versions and all other values set to their default values.
-	onlyRequiredVersion := bmwire.MsgVersion{
-		ProtocolVersion: 60002,
-		Services:        bmwire.SFNodeNetwork,
-		Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		AddrYou: bmwire.NetAddress{
-			Timestamp: time.Time{}, // Zero value -- no timestamp in version
-			Services:  bmwire.SFNodeNetwork,
-			IP:        net.ParseIP("192.168.0.1"),
-			Port:      8333,
-		},
-	}
-	onlyRequiredVersionEncoded := make([]byte, len(baseVersionEncoded)-55)
-	copy(onlyRequiredVersionEncoded, baseVersionEncoded)
-
-	// addrMeVersion is a version message that contains all fields through
-	// the AddrMe field.
-	addrMeVersion := onlyRequiredVersion
-	addrMeVersion.AddrMe = bmwire.NetAddress{
-		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  bmwire.SFNodeNetwork,
-		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
-	}
-	addrMeVersionEncoded := make([]byte, len(baseVersionEncoded)-29)
-	copy(addrMeVersionEncoded, baseVersionEncoded)
-
-	// nonceVersion is a version message that contains all fields through
-	// the Nonce field.
-	nonceVersion := addrMeVersion
-	nonceVersion.Nonce = 123123 // 0x1e0f3
-	nonceVersionEncoded := make([]byte, len(baseVersionEncoded)-21)
-	copy(nonceVersionEncoded, baseVersionEncoded)
-
-	// uaVersion is a version message that contains all fields through
-	// the UserAgent field.
-	uaVersion := nonceVersion
-	uaVersion.UserAgent = "/btcdtest:0.0.1/"
-	uaVersionEncoded := make([]byte, len(baseVersionEncoded)-4)
-	copy(uaVersionEncoded, baseVersionEncoded)
-
-	tests := []struct {
-		msg  *bmwire.MsgVersion // Expected message
-		buf  []byte             // Wire encoding
-		pver uint32             // Protocol version for bmwire.encoding
-	}{
-		{
-			&onlyRequiredVersion,
-			onlyRequiredVersionEncoded,
-			bmwire.ProtocolVersion,
-		},
-		{
-			&addrMeVersion,
-			addrMeVersionEncoded,
-			bmwire.ProtocolVersion,
-		},
-		{
-			&nonceVersion,
-			nonceVersionEncoded,
-			bmwire.ProtocolVersion,
-		},
-		{
-			&uaVersion,
-			uaVersionEncoded,
-			bmwire.ProtocolVersion,
-		},
-	}
-
-	for i, test := range tests {
-		// Decode the message from bmwire.format.
-		var msg bmwire.MsgVersion
-		rbuf := bytes.NewBuffer(test.buf)
-		err := msg.BtcDecode(rbuf, test.pver)
-		if err != nil {
-			t.Errorf("BtcDecode #%d error %v", i, err)
-			continue
-		}
-		if !reflect.DeepEqual(&msg, test.msg) {
-			t.Errorf("BtcDecode #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.msg))
-			continue
-		}
-	}
-}
-
 // baseVersion is used in the various tests as a baseline MsgVersion.
 var baseVersion = &bmwire.MsgVersion{
-	ProtocolVersion: 60002,
+	ProtocolVersion: 3,
 	Services:        bmwire.SFNodeNetwork,
 	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
 	AddrYou: bmwire.NetAddress{
@@ -490,73 +360,30 @@ var baseVersion = &bmwire.MsgVersion{
 		IP:        net.ParseIP("127.0.0.1"),
 		Port:      8333,
 	},
-	Nonce:     123123, // 0x1e0f3
-	UserAgent: "/btcdtest:0.0.1/",
+	Nonce:         123123, // 0x1e0f3
+	UserAgent:     "/btcdtest:0.0.1/",
+	StreamNumbers: []uint64{1},
 }
 
 // baseVersionEncoded is the bmwire.encoded bytes for baseVersion using protocol
 // version 60002 and is used in the various tests.
 var baseVersionEncoded = []byte{
-	0x62, 0xea, 0x00, 0x00, // Protocol version 60002
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-	0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
+	0x00, 0x00, 0x00, 0x03, // Protocol version 60002
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
 	// AddrYou -- No timestamp for NetAddress in version message
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
 	0x20, 0x8d, // Port 8333 in big-endian
 	// AddrMe -- No timestamp for NetAddress in version message
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
 	0x20, 0x8d, // Port 8333 in big-endian
-	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xe0, 0xf3, // Nonce
 	0x10, // Varint for user agent length
 	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
 	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
-	0xfa, 0x92, 0x03, 0x00, // Last block
-}
-
-// baseVersionBIP0037 is used in the various tests as a baseline MsgVersion for
-// BIP0037.
-var baseVersionBIP0037 = &bmwire.MsgVersion{
-	ProtocolVersion: 70001,
-	Services:        bmwire.SFNodeNetwork,
-	Timestamp:       time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	AddrYou: bmwire.NetAddress{
-		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  bmwire.SFNodeNetwork,
-		IP:        net.ParseIP("192.168.0.1"),
-		Port:      8333,
-	},
-	AddrMe: bmwire.NetAddress{
-		Timestamp: time.Time{}, // Zero value -- no timestamp in version
-		Services:  bmwire.SFNodeNetwork,
-		IP:        net.ParseIP("127.0.0.1"),
-		Port:      8333,
-	},
-	Nonce:     123123, // 0x1e0f3
-	UserAgent: "/btcdtest:0.0.1/",
-}
-
-// baseVersionBIP0037Encoded is the bmwire.encoded bytes for baseVersionBIP0037
-// using protocol version BIP0037Version and is used in the various tests.
-var baseVersionBIP0037Encoded = []byte{
-	0x71, 0x11, 0x01, 0x00, // Protocol version 70001
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-	0x29, 0xab, 0x5f, 0x49, 0x00, 0x00, 0x00, 0x00, // 64-bit Timestamp
-	// AddrYou -- No timestamp for NetAddress in version message
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0xff, 0xff, 0xc0, 0xa8, 0x00, 0x01, // IP 192.168.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
-	// AddrMe -- No timestamp for NetAddress in version message
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SFNodeNetwork
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
-	0x20, 0x8d, // Port 8333 in big-endian
-	0xf3, 0xe0, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, // Nonce
-	0x10, // Varint for user agent length
-	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
-	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
+	0x01, 0x01, // Stream Numbers
 }
