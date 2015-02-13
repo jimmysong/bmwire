@@ -69,9 +69,6 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdGetData:
 		msg = &MsgGetData{}
 
-	case CmdObject:
-		msg = &MsgObject{}
-
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
 	}
@@ -255,33 +252,92 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	}
 
 	// Create struct of appropriate message type based on the command.
-	msg, err := makeEmptyMessage(command)
-	if err != nil {
-		discardInput(r, hdr.length)
-		return totalBytes, nil, nil, messageError("ReadMessage",
-			err.Error())
-	}
-
-	// Check for maximum length based on the message type as a malicious client
-	// could otherwise create a well-formed header and set the length to max
-	// numbers in order to exhaust the machine's memory.
-	mpl := msg.MaxPayloadLength(pver)
-	if hdr.length > mpl {
-		discardInput(r, hdr.length)
-		str := fmt.Sprintf("payload exceeds max length - header "+
-			"indicates %v bytes, but max payload size for "+
-			"messages of type [%v] is %v.", hdr.length, command, mpl)
-		return totalBytes, nil, nil, messageError("ReadMessage", str)
-	}
-
-	// Read payload.
+	var msg Message
 	payload := make([]byte, hdr.length)
-	n, err = io.ReadFull(r, payload)
-	if err != nil {
+	if command == CmdObject {
+		// Handle objects differently because we need to read a bit to
+		// know what message type it is
+
+		// read payload
+		n, err = io.ReadFull(r, payload)
 		totalBytes += n
-		return totalBytes, nil, nil, err
+		if err != nil {
+			return totalBytes, nil, nil, err
+		}
+
+		tmpr := bytes.NewBuffer(payload)
+		var nonce uint64
+		var sec int64
+		var objType ObjectType
+		err := readElements(tmpr, &nonce, &sec, &objType)
+		if err != nil {
+			return totalBytes, nil, nil, messageError("ReadMessage",
+				err.Error())
+		}
+
+		switch objType {
+		case ObjectTypeGetPubKey:
+			msg = &MsgGetPubKey{}
+		case ObjectTypePubKey:
+			msg = &MsgPubKey{}
+		// case ObjectTypeMsg:
+		// 	msg = &MsgMsg{
+		// 		Nonce:       nonce,
+		// 		ExpiresTime: expires,
+		// 		ObjectType:  objType,
+		// 	}
+		// case ObjectTypeBroadcast:
+		// 	msg = &MsgBroadcast{
+		// 		Nonce:       nonce,
+		// 		ExpiresTime: expires,
+		// 		ObjectType:  objType,
+		// 	}
+		default:
+			str := fmt.Sprintf("unknown object type %d", objType)
+			return totalBytes, nil, nil, messageError("ReadMessage", str)
+		}
+
+		// Check for maximum length based on the message type as a malicious
+		// client could otherwise create a well-formed header and set the
+		// length to max numbers in order to exhaust the machine's memory.
+		mpl := msg.MaxPayloadLength(pver)
+		if hdr.length > mpl {
+			str := fmt.Sprintf("payload exceeds max length - header "+
+				"indicates %v bytes, but max payload size for "+
+				"messages of type [%v] is %v.", hdr.length, command, mpl)
+			return totalBytes, nil, nil, messageError("ReadMessage", str)
+		}
+
+	} else {
+		msg, err = makeEmptyMessage(command)
+		if err != nil {
+			discardInput(r, hdr.length)
+			return totalBytes, nil, nil, messageError("ReadMessage",
+				err.Error())
+		}
+
+		// Check for maximum length based on the message type as a malicious
+		// client could otherwise create a well-formed header and set the
+		// length to max numbers in order to exhaust the machine's memory.
+		mpl := msg.MaxPayloadLength(pver)
+		if hdr.length > mpl {
+			discardInput(r, hdr.length)
+			str := fmt.Sprintf("payload exceeds max length - header "+
+				"indicates %v bytes, but max payload size for "+
+				"messages of type [%v] is %v.", hdr.length, command, mpl)
+			return totalBytes, nil, nil, messageError("ReadMessage", str)
+		}
+
+		// Read payload.
+		if command != CmdObject {
+			n, err = io.ReadFull(r, payload)
+			totalBytes += n
+			if err != nil {
+				return totalBytes, nil, nil, err
+			}
+		}
+
 	}
-	totalBytes += n
 
 	// Test checksum.
 	checksum := Sha512(payload)[0:4]

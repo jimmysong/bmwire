@@ -58,9 +58,13 @@ func TestMessage(t *testing.T) {
 	msgAddr := bmwire.NewMsgAddr()
 	msgInv := bmwire.NewMsgInv()
 	msgGetData := bmwire.NewMsgGetData()
-	twentyBytes := make([]byte, 20)
+
+	// ripe-based getpubkey message
+	var ripe [20]byte
+	ripe[0] = 1
+	var tag [32]byte
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	msgObject := bmwire.NewMsgObject(83928, expires, bmwire.ObjectTypeGetPubKey, 1, 1, twentyBytes)
+	msgGetPubKey := bmwire.NewMsgGetPubKey(123123, expires, 2, 1, ripe, tag)
 
 	tests := []struct {
 		in     bmwire.Message    // Value to encode
@@ -69,13 +73,13 @@ func TestMessage(t *testing.T) {
 		btcnet bmwire.BitcoinNet // Network to use for bmwire.encoding
 		bytes  int               // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, bmwire.MainNet, 122},
+		{msgVersion, msgVersion, pver, bmwire.MainNet, 121},
 		{msgVerack, msgVerack, pver, bmwire.MainNet, 24},
 		{msgGetAddr, msgGetAddr, pver, bmwire.MainNet, 24},
 		{msgAddr, msgAddr, pver, bmwire.MainNet, 25},
 		{msgInv, msgInv, pver, bmwire.MainNet, 25},
 		{msgGetData, msgGetData, pver, bmwire.MainNet, 25},
-		{msgObject, msgObject, pver, bmwire.MainNet, 66},
+		{msgGetPubKey, msgGetPubKey, pver, bmwire.MainNet, 66},
 	}
 
 	t.Logf("Running %d tests", len(tests))

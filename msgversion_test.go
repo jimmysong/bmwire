@@ -181,12 +181,6 @@ func TestVersion(t *testing.T) {
 // TestVersionWire tests the MsgVersion bmwire.encode and decode for various
 // protocol versions.
 func TestVersionWire(t *testing.T) {
-	// verRelayTxFalse and verRelayTxFalseEncoded is a version message as of
-	// BIP0037Version with the transaction relay disabled.
-	verRelayTxFalseEncoded := make([]byte, len(baseVersionEncoded))
-	copy(verRelayTxFalseEncoded, baseVersionEncoded)
-	verRelayTxFalseEncoded[len(verRelayTxFalseEncoded)-1] = 0
-
 	tests := []struct {
 		in   *bmwire.MsgVersion // Message to encode
 		out  *bmwire.MsgVersion // Expected decoded message
@@ -236,11 +230,8 @@ func TestVersionWire(t *testing.T) {
 // TestVersionWireErrors performs negative tests against bmwire.encode and
 // decode of MsgGetHeaders to confirm error paths work correctly.
 func TestVersionWireErrors(t *testing.T) {
-	// Use protocol version 60002 specifically here instead of the latest
-	// because the test data is using bytes encoded with that protocol
-	// version.
-	pver := uint32(60002)
-	//	wireErr := &bmwire.MessageError{}
+	pver := uint32(3)
+	wireErr := &bmwire.MessageError{}
 
 	// Ensure calling MsgVersion.BtcDecode with a non *bytes.Buffer returns
 	// error.
@@ -263,16 +254,16 @@ func TestVersionWireErrors(t *testing.T) {
 		t.Errorf("writeVarInt: error %v", err)
 	}
 
-	// // Make a new buffer big enough to hold the base version plus the new
-	// // bytes for the bigger varint to hold the new size of the user agent
-	// // and the new user agent string.  Then stich it all together.
-	// newLen := len(baseVersionEncoded) - len(baseVersion.UserAgent)
-	// newLen = newLen + len(newUAVarIntBuf.Bytes()) - 1 + len(newUA)
-	// exceedUAVerEncoded := make([]byte, newLen)
-	// copy(exceedUAVerEncoded, baseVersionEncoded[0:80])
-	// copy(exceedUAVerEncoded[80:], newUAVarIntBuf.Bytes())
-	// copy(exceedUAVerEncoded[83:], []byte(newUA))
-	// copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[97:100])
+	// Make a new buffer big enough to hold the base version plus the new
+	// bytes for the bigger varint to hold the new size of the user agent
+	// and the new user agent string.  Then stich it all together.
+	newLen := len(baseVersionEncoded) - len(baseVersion.UserAgent)
+	newLen = newLen + len(newUAVarIntBuf.Bytes()) - 1 + len(newUA)
+	exceedUAVerEncoded := make([]byte, newLen)
+	copy(exceedUAVerEncoded, baseVersionEncoded[0:80])
+	copy(exceedUAVerEncoded[80:], newUAVarIntBuf.Bytes())
+	copy(exceedUAVerEncoded[83:], []byte(newUA))
+	copy(exceedUAVerEncoded[83+len(newUA):], baseVersionEncoded[99:])
 
 	tests := []struct {
 		in       *bmwire.MsgVersion // Value to encode
@@ -298,6 +289,12 @@ func TestVersionWireErrors(t *testing.T) {
 		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
 		// Force error in user agent.
 		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		// Force error in validating user agent
+		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
+		// Force error in stream numbers length.
+		{baseVersion, baseVersionEncoded, pver, 99, io.ErrShortWrite, io.EOF},
+		// Force error in stream number.
+		{baseVersion, baseVersionEncoded, pver, 100, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -361,14 +358,13 @@ var baseVersion = &bmwire.MsgVersion{
 		Port:      8333,
 	},
 	Nonce:         123123, // 0x1e0f3
-	UserAgent:     "/btcdtest:0.0.1/",
+	UserAgent:     "/bmwiretest:0.0.1/",
 	StreamNumbers: []uint64{1},
 }
 
-// baseVersionEncoded is the bmwire.encoded bytes for baseVersion using protocol
-// version 60002 and is used in the various tests.
+// baseVersionEncoded is the bmwire.encoded bytes for baseVersion
 var baseVersionEncoded = []byte{
-	0x00, 0x00, 0x00, 0x03, // Protocol version 60002
+	0x00, 0x00, 0x00, 0x03, // Protocol version 3
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // SFNodeNetwork
 	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
 	// AddrYou -- No timestamp for NetAddress in version message
@@ -382,8 +378,9 @@ var baseVersionEncoded = []byte{
 	0x00, 0x00, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x01, // IP 127.0.0.1
 	0x20, 0x8d, // Port 8333 in big-endian
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xe0, 0xf3, // Nonce
-	0x10, // Varint for user agent length
-	0x2f, 0x62, 0x74, 0x63, 0x64, 0x74, 0x65, 0x73,
-	0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e, 0x31, 0x2f, // User agent
+	0x12, // Varint for user agent length
+	0x2f, 0x62, 0x6d, 0x77, 0x69, 0x72, 0x65, 0x74,
+	0x65, 0x73, 0x74, 0x3a, 0x30, 0x2e, 0x30, 0x2e,
+	0x31, 0x2f, // User agent
 	0x01, 0x01, // Stream Numbers
 }
