@@ -71,13 +71,9 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
-// The version message is special in that the protocol version hasn't been
-// negotiated yet.  As a result, the pver field is ignored and any fields which
-// are added in new versions are optional.  This also mean that r must be a
-// *bytes.Buffer so the number of remaining bytes can be ascertained.
 //
 // This is part of the Message interface implementation.
-func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
+func (msg *MsgVersion) Decode(r io.Reader) error {
 	buf, ok := r.(*bytes.Buffer)
 	if !ok {
 		return fmt.Errorf("MsgVersion.Decode reader is not a " +
@@ -91,12 +87,12 @@ func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
 	}
 	msg.Timestamp = time.Unix(sec, 0)
 
-	err = readNetAddress(buf, pver, &msg.AddrYou, false)
+	err = readNetAddress(buf, &msg.AddrYou, false)
 	if err != nil {
 		return err
 	}
 
-	err = readNetAddress(buf, pver, &msg.AddrMe, false)
+	err = readNetAddress(buf, &msg.AddrMe, false)
 	if err != nil {
 		return err
 	}
@@ -104,7 +100,7 @@ func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
 	if err != nil {
 		return err
 	}
-	userAgent, err := readVarString(buf, pver)
+	userAgent, err := readVarString(buf)
 	if err != nil {
 		return err
 	}
@@ -114,13 +110,13 @@ func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
 	}
 	msg.UserAgent = userAgent
 
-	streamLen, err := readVarInt(buf, pver)
+	streamLen, err := readVarInt(buf)
 	if err != nil {
 		return err
 	}
 	msg.StreamNumbers = make([]uint64, int(streamLen))
 	for i := uint64(0); i < streamLen; i++ {
-		msg.StreamNumbers[i], err = readVarInt(buf, pver)
+		msg.StreamNumbers[i], err = readVarInt(buf)
 		if err != nil {
 			return err
 		}
@@ -131,7 +127,7 @@ func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgVersion) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgVersion) Encode(w io.Writer) error {
 	err := validateUserAgent(msg.UserAgent)
 	if err != nil {
 		return err
@@ -143,12 +139,12 @@ func (msg *MsgVersion) Encode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeNetAddress(w, pver, &msg.AddrYou, false)
+	err = writeNetAddress(w, &msg.AddrYou, false)
 	if err != nil {
 		return err
 	}
 
-	err = writeNetAddress(w, pver, &msg.AddrMe, false)
+	err = writeNetAddress(w, &msg.AddrMe, false)
 	if err != nil {
 		return err
 	}
@@ -158,17 +154,17 @@ func (msg *MsgVersion) Encode(w io.Writer, pver uint32) error {
 		return err
 	}
 
-	err = writeVarString(w, pver, msg.UserAgent)
+	err = writeVarString(w, msg.UserAgent)
 	if err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, pver, uint64(len(msg.StreamNumbers)))
+	err = writeVarInt(w, uint64(len(msg.StreamNumbers)))
 	if err != nil {
 		return err
 	}
 	for _, stream := range msg.StreamNumbers {
-		err = writeVarInt(w, pver, stream)
+		err = writeVarInt(w, stream)
 		if err != nil {
 			return err
 		}
@@ -185,14 +181,14 @@ func (msg *MsgVersion) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgVersion) MaxPayloadLength() uint32 {
 	// XXX: <= 106 different
 
 	// Protocol version 4 bytes + services 8 bytes + timestamp 8 bytes +
 	// remote and local net addresses + nonce 8 bytes + length of user
 	// agent (varInt) + max allowed useragent length + last block 4 bytes +
 	// relay transactions flag 1 byte.
-	return 33 + (maxNetAddressPayload(pver) * 2) + MaxVarIntPayload +
+	return 33 + (maxNetAddressPayload() * 2) + MaxVarIntPayload +
 		MaxUserAgentLen
 }
 

@@ -16,8 +16,6 @@ import (
 
 // TestInv tests the MsgInv API.
 func TestInv(t *testing.T) {
-	pver := bmwire.ProtocolVersion
-
 	// Ensure the command is expected value.
 	wantCmd := "inv"
 	msg := bmwire.NewMsgInv()
@@ -29,11 +27,10 @@ func TestInv(t *testing.T) {
 	// Ensure max payload is expected value for latest protocol version.
 	// Num inventory vectors (varInt) + max allowed inventory vectors.
 	wantPayload := uint32(1600009)
-	maxPayload := msg.MaxPayloadLength(pver)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"- got %v, want %v", maxPayload, wantPayload)
 	}
 
 	// Ensure inventory vectors are added properly.
@@ -113,17 +110,15 @@ func TestInvWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *bmwire.MsgInv // Message to encode
-		out  *bmwire.MsgInv // Expected decoded message
-		buf  []byte         // Wire encoding
-		pver uint32         // Protocol version for bmwire.encoding
+		in  *bmwire.MsgInv // Message to encode
+		out *bmwire.MsgInv // Expected decoded message
+		buf []byte         // Wire encoding
 	}{
 		// Latest protocol version with no inv vectors.
 		{
 			NoInv,
 			NoInv,
 			NoInvEncoded,
-			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple inv vectors.
@@ -131,7 +126,6 @@ func TestInvWire(t *testing.T) {
 			MultiInv,
 			MultiInv,
 			MultiInvEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -139,7 +133,7 @@ func TestInvWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
-		err := test.in.Encode(&buf, test.pver)
+		err := test.in.Encode(&buf)
 		if err != nil {
 			t.Errorf("Encode #%d error %v", i, err)
 			continue
@@ -153,7 +147,7 @@ func TestInvWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var msg bmwire.MsgInv
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf, test.pver)
+		err = msg.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
@@ -169,7 +163,6 @@ func TestInvWire(t *testing.T) {
 // TestInvWireErrors performs negative tests against bmwire.encode and decode
 // of MsgInv to confirm error paths work correctly.
 func TestInvWireErrors(t *testing.T) {
-	pver := bmwire.ProtocolVersion
 	wireErr := &bmwire.MessageError{}
 
 	// Block 203707 hash.
@@ -206,25 +199,24 @@ func TestInvWireErrors(t *testing.T) {
 	tests := []struct {
 		in       *bmwire.MsgInv // Value to encode
 		buf      []byte         // Wire encoding
-		pver     uint32         // Protocol version for bmwire.encoding
 		max      int            // Max size of fixed buffer to induce errors
 		writeErr error          // Expected write error
 		readErr  error          // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in inventory vector count
-		{baseInv, baseInvEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseInv, baseInvEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in inventory list.
-		{baseInv, baseInvEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		{baseInv, baseInvEncoded, 1, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max inventory vectors.
-		{maxInv, maxInvEncoded, pver, 3, wireErr, wireErr},
+		{maxInv, maxInvEncoded, 3, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
-		err := test.in.Encode(w, test.pver)
+		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -244,7 +236,7 @@ func TestInvWireErrors(t *testing.T) {
 		// Decode from bmwire.format.
 		var msg bmwire.MsgInv
 		r := newFixedReader(test.max, test.buf)
-		err = msg.Decode(r, test.pver)
+		err = msg.Decode(r)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)

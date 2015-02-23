@@ -35,8 +35,6 @@ func makeHeader(bmnet bmwire.BitmessageNet, command string,
 
 // TestMessage tests the Read/WriteMessage and Read/WriteMessageN API.
 func TestMessage(t *testing.T) {
-	pver := bmwire.ProtocolVersion
-
 	// Create the various types of messages to test.
 
 	// MsgVersion.
@@ -60,33 +58,48 @@ func TestMessage(t *testing.T) {
 	msgGetData := bmwire.NewMsgGetData()
 
 	// ripe-based getpubkey message
-	var ripe [20]byte
-	ripe[0] = 1
-	var tag [32]byte
+	ripeBytes := make([]byte, 20)
+	ripeBytes[0] = 1
+	ripe, err := bmwire.NewRipeHash(ripeBytes)
+	if err != nil {
+		t.Fatalf("could not make a ripe hash %s", err)
+	}
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	msgGetPubKey := bmwire.NewMsgGetPubKey(123123, expires, 2, 1, ripe, tag)
+	msgGetPubKey := bmwire.NewMsgGetPubKey(123123, expires, 2, 1, ripe, nil)
+
+	pub1Bytes, pub2Bytes := make([]byte, 64), make([]byte, 64)
+	pub2Bytes[0] = 1
+	pub1, err := bmwire.NewPubKey(pub1Bytes)
+	if err != nil {
+		t.Fatalf("could not create a pubkey %s", err)
+	}
+	pub2, err := bmwire.NewPubKey(pub2Bytes)
+	if err != nil {
+		t.Fatalf("could not create a pubkey %s", err)
+	}
+	msgPubKey := bmwire.NewMsgPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
 
 	tests := []struct {
-		in     bmwire.Message       // Value to encode
-		out    bmwire.Message       // Expected decoded value
-		pver   uint32               // Protocol version for bmwire.encoding
+		in    bmwire.Message       // Value to encode
+		out   bmwire.Message       // Expected decoded value
 		bmnet bmwire.BitmessageNet // Network to use for bmwire.encoding
-		bytes  int                  // Expected num bytes read/written
+		bytes int                  // Expected num bytes read/written
 	}{
-		{msgVersion, msgVersion, pver, bmwire.MainNet, 121},
-		{msgVerack, msgVerack, pver, bmwire.MainNet, 24},
-		{msgGetAddr, msgGetAddr, pver, bmwire.MainNet, 24},
-		{msgAddr, msgAddr, pver, bmwire.MainNet, 25},
-		{msgInv, msgInv, pver, bmwire.MainNet, 25},
-		{msgGetData, msgGetData, pver, bmwire.MainNet, 25},
-		{msgGetPubKey, msgGetPubKey, pver, bmwire.MainNet, 66},
+		{msgVersion, msgVersion, bmwire.MainNet, 121},
+		{msgVerack, msgVerack, bmwire.MainNet, 24},
+		{msgGetAddr, msgGetAddr, bmwire.MainNet, 24},
+		{msgAddr, msgAddr, bmwire.MainNet, 25},
+		{msgInv, msgInv, bmwire.MainNet, 25},
+		{msgGetData, msgGetData, bmwire.MainNet, 25},
+		{msgGetPubKey, msgGetPubKey, bmwire.MainNet, 66},
+		{msgPubKey, msgPubKey, bmwire.MainNet, 178},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		var buf bytes.Buffer
-		nw, err := bmwire.WriteMessageN(&buf, test.in, test.pver, test.bmnet)
+		nw, err := bmwire.WriteMessageN(&buf, test.in, test.bmnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -100,7 +113,7 @@ func TestMessage(t *testing.T) {
 
 		// Decode from bmwire.format.
 		rbuf := bytes.NewReader(buf.Bytes())
-		nr, msg, _, err := bmwire.ReadMessageN(rbuf, test.pver, test.bmnet)
+		nr, msg, _, err := bmwire.ReadMessageN(rbuf, test.bmnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
 				spew.Sdump(msg))
@@ -125,7 +138,7 @@ func TestMessage(t *testing.T) {
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		var buf bytes.Buffer
-		err := bmwire.WriteMessage(&buf, test.in, test.pver, test.bmnet)
+		err := bmwire.WriteMessage(&buf, test.in, test.bmnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -133,7 +146,7 @@ func TestMessage(t *testing.T) {
 
 		// Decode from bmwire.format.
 		rbuf := bytes.NewReader(buf.Bytes())
-		msg, _, err := bmwire.ReadMessage(rbuf, test.pver, test.bmnet)
+		msg, _, err := bmwire.ReadMessage(rbuf, test.bmnet)
 		if err != nil {
 			t.Errorf("ReadMessage #%d error %v, msg %v", i, err,
 				spew.Sdump(msg))
@@ -150,7 +163,6 @@ func TestMessage(t *testing.T) {
 // TestReadMessageWireErrors performs negative tests against bmwire.decoding into
 // concrete messages to confirm error paths work correctly.
 func TestReadMessageWireErrors(t *testing.T) {
-	pver := bmwire.ProtocolVersion
 	bmnet := bmwire.MainNet
 
 	// Ensure message errors are as expected with no function specified.
@@ -208,10 +220,27 @@ func TestReadMessageWireErrors(t *testing.T) {
 	// wrong network bytes
 	wrongNetBytes := makeHeader(0x09090909, "", 0, 0)
 
+	// wrong number of payload bytes within object command
+	badReadBytes := makeHeader(bmnet, "object", 10, 0)
+
+	// no actual object payload
+	badPayloadBytes := makeHeader(bmnet, "object", 0, 0)
+
+	// unknown object
+	unknownObjectBytes := makeHeader(bmnet, "object", 20, 0)
+	unknownObjectBytes = append(unknownObjectBytes, []byte{
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 5,
+	}...)
+
+	// too long object
+	tooLongObjectBytes := makeHeader(bmnet, "object", 1<<18+1, 0)
+	tooLongObjectBytes = append(tooLongObjectBytes, make([]byte, 1<<18+1)...)
+
 	tests := []struct {
 		buf     []byte               // Wire encoding
-		pver    uint32               // Protocol version for bmwire.encoding
-		bmnet  bmwire.BitmessageNet // Bitmessage network for bmwire.encoding
+		bmnet   bmwire.BitmessageNet // Bitmessage network for bmwire.encoding
 		max     int                  // Max size of fixed buffer to induce errors
 		readErr error                // Expected read error
 		bytes   int                  // Expected num bytes read
@@ -221,7 +250,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Short header.
 		{
 			[]byte{},
-			pver,
 			bmnet,
 			0,
 			io.EOF,
@@ -231,7 +259,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Wrong network.  Want MainNet, but giving wrong network.
 		{
 			wrongNetBytes,
-			pver,
 			bmnet,
 			len(wrongNetBytes),
 			&bmwire.MessageError{},
@@ -241,7 +268,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Exceed max overall message payload length.
 		{
 			exceedMaxPayloadBytes,
-			pver,
 			bmnet,
 			len(exceedMaxPayloadBytes),
 			&bmwire.MessageError{},
@@ -251,7 +277,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Invalid UTF-8 command.
 		{
 			badCommandBytes,
-			pver,
 			bmnet,
 			len(badCommandBytes),
 			&bmwire.MessageError{},
@@ -261,7 +286,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Valid, but unsupported command.
 		{
 			unsupportedCommandBytes,
-			pver,
 			bmnet,
 			len(unsupportedCommandBytes),
 			&bmwire.MessageError{},
@@ -271,7 +295,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Exceed max allowed payload for a message of a specific type.
 		{
 			exceedTypePayloadBytes,
-			pver,
 			bmnet,
 			len(exceedTypePayloadBytes),
 			&bmwire.MessageError{},
@@ -281,7 +304,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Message with a payload shorter than the header indicates.
 		{
 			shortPayloadBytes,
-			pver,
 			bmnet,
 			len(shortPayloadBytes),
 			io.EOF,
@@ -291,7 +313,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Message with a bad checksum.
 		{
 			badChecksumBytes,
-			pver,
 			bmnet,
 			len(badChecksumBytes),
 			&bmwire.MessageError{},
@@ -301,7 +322,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// Message with a valid header, but wrong format.
 		{
 			badMessageBytes,
-			pver,
 			bmnet,
 			len(badMessageBytes),
 			io.EOF,
@@ -311,11 +331,46 @@ func TestReadMessageWireErrors(t *testing.T) {
 		// 15k bytes of data to discard.
 		{
 			discardBytes,
-			pver,
 			bmnet,
 			len(discardBytes),
 			&bmwire.MessageError{},
 			24,
+		},
+
+		// object type message without enough payload
+		{
+			badReadBytes,
+			bmnet,
+			len(badReadBytes),
+			io.EOF,
+			24,
+		},
+
+		// object type message without actual payload
+		{
+			badPayloadBytes,
+			bmnet,
+			len(badPayloadBytes),
+			&bmwire.MessageError{},
+			24,
+		},
+
+		// object type message with unknown object
+		{
+			unknownObjectBytes,
+			bmnet,
+			len(unknownObjectBytes),
+			&bmwire.MessageError{},
+			44,
+		},
+
+		// object type message that's too long
+		{
+			tooLongObjectBytes,
+			bmnet,
+			len(tooLongObjectBytes),
+			&bmwire.MessageError{},
+			1<<18 + 1 + 24,
 		},
 	}
 
@@ -323,7 +378,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 	for i, test := range tests {
 		// Decode from bmwire.format.
 		r := newFixedReader(test.max, test.buf)
-		nr, _, _, err := bmwire.ReadMessageN(r, test.pver, test.bmnet)
+		nr, _, _, err := bmwire.ReadMessageN(r, test.bmnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.readErr)
@@ -352,7 +407,6 @@ func TestReadMessageWireErrors(t *testing.T) {
 // TestWriteMessageWireErrors performs negative tests against bmwire.encoding from
 // concrete messages to confirm error paths work correctly.
 func TestWriteMessageWireErrors(t *testing.T) {
-	pver := bmwire.ProtocolVersion
 	bmnet := bmwire.MainNet
 	wireErr := &bmwire.MessageError{}
 
@@ -376,32 +430,31 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	bogusMsg := &fakeMessage{command: "bogus", payload: bogusPayload}
 
 	tests := []struct {
-		msg    bmwire.Message       // Message to encode
-		pver   uint32               // Protocol version for bmwire.encoding
+		msg   bmwire.Message       // Message to encode
 		bmnet bmwire.BitmessageNet // Bitmessage network for bmwire.encoding
-		max    int                  // Max size of fixed buffer to induce errors
-		err    error                // Expected error
-		bytes  int                  // Expected num bytes written
+		max   int                  // Max size of fixed buffer to induce errors
+		err   error                // Expected error
+		bytes int                  // Expected num bytes written
 	}{
 		// Command too long.
-		{badCommandMsg, pver, bmnet, 0, wireErr, 0},
+		{badCommandMsg, bmnet, 0, wireErr, 0},
 		// Force error in payload encode.
-		{encodeErrMsg, pver, bmnet, 0, wireErr, 0},
+		{encodeErrMsg, bmnet, 0, wireErr, 0},
 		// Force error due to exceeding max overall message payload size.
-		{exceedOverallPayloadErrMsg, pver, bmnet, 0, wireErr, 0},
+		{exceedOverallPayloadErrMsg, bmnet, 0, wireErr, 0},
 		// Force error due to exceeding max payload for message type.
-		{exceedPayloadErrMsg, pver, bmnet, 0, wireErr, 0},
+		{exceedPayloadErrMsg, bmnet, 0, wireErr, 0},
 		// Force error in header write.
-		{bogusMsg, pver, bmnet, 0, io.ErrShortWrite, 0},
+		{bogusMsg, bmnet, 0, io.ErrShortWrite, 0},
 		// Force error in payload write.
-		{bogusMsg, pver, bmnet, 24, io.ErrShortWrite, 24},
+		{bogusMsg, bmnet, 24, io.ErrShortWrite, 24},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode bmwire.format.
 		w := newFixedWriter(test.max)
-		nw, err := bmwire.WriteMessageN(w, test.msg, test.pver, test.bmnet)
+		nw, err := bmwire.WriteMessageN(w, test.msg, test.bmnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("WriteMessage #%d wrong error got: %v <%T>, "+
 				"want: %T", i, err, err, test.err)

@@ -57,8 +57,8 @@ func (msg *MsgAddr) ClearAddresses() {
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgAddr) Decode(r io.Reader, pver uint32) error {
-	count, err := readVarInt(r, pver)
+func (msg *MsgAddr) Decode(r io.Reader) error {
+	count, err := readVarInt(r)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (msg *MsgAddr) Decode(r io.Reader, pver uint32) error {
 	msg.AddrList = make([]*NetAddress, 0, count)
 	for i := uint64(0); i < count; i++ {
 		na := NetAddress{}
-		err := readNetAddress(r, pver, &na, true)
+		err := readNetAddress(r, &na, true)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (msg *MsgAddr) Decode(r io.Reader, pver uint32) error {
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgAddr) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgAddr) Encode(w io.Writer) error {
 	// Protocol versions before MultipleAddressVersion only allowed 1 address
 	// per message.
 	count := len(msg.AddrList)
@@ -94,13 +94,13 @@ func (msg *MsgAddr) Encode(w io.Writer, pver uint32) error {
 		return messageError("MsgAddr.Encode", str)
 	}
 
-	err := writeVarInt(w, pver, uint64(count))
+	err := writeVarInt(w, uint64(count))
 	if err != nil {
 		return err
 	}
 
 	for _, na := range msg.AddrList {
-		err = writeNetAddress(w, pver, na, true)
+		err = writeNetAddress(w, na, true)
 		if err != nil {
 			return err
 		}
@@ -117,9 +117,9 @@ func (msg *MsgAddr) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgAddr) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgAddr) MaxPayloadLength() uint32 {
 	// Num addresses (varInt) + max allowed addresses.
-	return MaxVarIntPayload + (MaxAddrPerMsg * maxNetAddressPayload(pver))
+	return MaxVarIntPayload + (MaxAddrPerMsg * maxNetAddressPayload())
 }
 
 // NewMsgAddr returns a new bitmessage addr message that conforms to the

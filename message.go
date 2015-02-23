@@ -40,10 +40,10 @@ const (
 // and may therefore contain additional or fewer fields than those which
 // are used directly in the protocol encoded message.
 type Message interface {
-	Decode(io.Reader, uint32) error
-	Encode(io.Writer, uint32) error
+	Decode(io.Reader) error
+	Encode(io.Writer) error
 	Command() string
-	MaxPayloadLength(uint32) uint32
+	MaxPayloadLength() uint32
 }
 
 // makeEmptyMessage creates a message of the appropriate concrete type based
@@ -130,7 +130,7 @@ func discardInput(r io.Reader, n uint32) {
 // WriteMessageN writes a bitmessage Message to w including the necessary header
 // information and returns the number of bytes written.    This function is the
 // same as WriteMessage except it also returns the number of bytes written.
-func WriteMessageN(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) (int, error) {
+func WriteMessageN(w io.Writer, msg Message, bmnet BitmessageNet) (int, error) {
 	totalBytes := 0
 
 	// Enforce max command size.
@@ -145,7 +145,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) (
 
 	// Encode the message payload.
 	var bw bytes.Buffer
-	err := msg.Encode(&bw, pver)
+	err := msg.Encode(&bw)
 	if err != nil {
 		return totalBytes, err
 	}
@@ -161,7 +161,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) (
 	}
 
 	// Enforce maximum message payload based on the message type.
-	mpl := msg.MaxPayloadLength(pver)
+	mpl := msg.MaxPayloadLength()
 	if uint32(lenp) > mpl {
 		str := fmt.Sprintf("message payload is too large - encoded "+
 			"%d bytes, but maximum message payload size for "+
@@ -207,8 +207,8 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) (
 // doesn't return the number of bytes written.  This function is mainly provided
 // for backwards compatibility with the original API, but it's also useful for
 // callers that don't care about byte counts.
-func WriteMessage(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) error {
-	_, err := WriteMessageN(w, msg, pver, bmnet)
+func WriteMessage(w io.Writer, msg Message, bmnet BitmessageNet) error {
+	_, err := WriteMessageN(w, msg, bmnet)
 	return err
 }
 
@@ -217,7 +217,7 @@ func WriteMessage(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) er
 // bytes read in addition to the parsed Message and raw bytes which comprise the
 // message.  This function is the same as ReadMessage except it also returns the
 // number of bytes read.
-func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, []byte, error) {
+func ReadMessageN(r io.Reader, bmnet BitmessageNet) (int, Message, []byte, error) {
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	if err != nil {
@@ -300,7 +300,7 @@ func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, 
 		// Check for maximum length based on the message type as a malicious
 		// client could otherwise create a well-formed header and set the
 		// length to max numbers in order to exhaust the machine's memory.
-		mpl := msg.MaxPayloadLength(pver)
+		mpl := msg.MaxPayloadLength()
 		if hdr.length > mpl {
 			str := fmt.Sprintf("payload exceeds max length - header "+
 				"indicates %v bytes, but max payload size for "+
@@ -319,7 +319,7 @@ func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, 
 		// Check for maximum length based on the message type as a malicious
 		// client could otherwise create a well-formed header and set the
 		// length to max numbers in order to exhaust the machine's memory.
-		mpl := msg.MaxPayloadLength(pver)
+		mpl := msg.MaxPayloadLength()
 		if hdr.length > mpl {
 			discardInput(r, hdr.length)
 			str := fmt.Sprintf("payload exceeds max length - header "+
@@ -352,7 +352,7 @@ func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, 
 	// MsgVersion Decode function requires it.
 	pr := bytes.NewBuffer(payload)
 
-	err = msg.Decode(pr, pver)
+	err = msg.Decode(pr)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
@@ -366,7 +366,7 @@ func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, 
 // from ReadMessageN in that it doesn't return the number of bytes read.  This
 // function is mainly provided for backwards compatibility with the original
 // API, but it's also useful for callers that don't care about byte counts.
-func ReadMessage(r io.Reader, pver uint32, bmnet BitmessageNet) (Message, []byte, error) {
-	_, msg, buf, err := ReadMessageN(r, pver, bmnet)
+func ReadMessage(r io.Reader, bmnet BitmessageNet) (Message, []byte, error) {
+	_, msg, buf, err := ReadMessageN(r, bmnet)
 	return msg, buf, err
 }

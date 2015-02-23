@@ -18,13 +18,13 @@ type MsgGetAddr struct{}
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetAddr) Decode(r io.Reader, pver uint32) error {
+func (msg *MsgGetAddr) Decode(r io.Reader) error {
 	return nil
 }
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetAddr) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgGetAddr) Encode(w io.Writer) error {
 	return nil
 }
 
@@ -36,7 +36,7 @@ func (msg *MsgGetAddr) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetAddr) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgGetAddr) MaxPayloadLength() uint32 {
 	return 0
 }
 

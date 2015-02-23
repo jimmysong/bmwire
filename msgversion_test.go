@@ -119,11 +119,10 @@ func TestVersion(t *testing.T) {
 	// (varInt) + max allowed user agent length + last block 4 bytes +
 	// relay transactions flag 1 byte.
 	wantPayload := uint32(2102)
-	maxPayload := msg.MaxPayloadLength(pver)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"got %v, want %v", maxPayload, wantPayload)
 	}
 
 	// Ensure adding the full service node flag works.
@@ -182,17 +181,15 @@ func TestVersion(t *testing.T) {
 // protocol versions.
 func TestVersionWire(t *testing.T) {
 	tests := []struct {
-		in   *bmwire.MsgVersion // Message to encode
-		out  *bmwire.MsgVersion // Expected decoded message
-		buf  []byte             // Wire encoding
-		pver uint32             // Protocol version for bmwire.encoding
+		in  *bmwire.MsgVersion // Message to encode
+		out *bmwire.MsgVersion // Expected decoded message
+		buf []byte             // Wire encoding
 	}{
 		// Latest protocol version.
 		{
 			baseVersion,
 			baseVersion,
 			baseVersionEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -200,7 +197,7 @@ func TestVersionWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
-		err := test.in.Encode(&buf, test.pver)
+		err := test.in.Encode(&buf)
 		if err != nil {
 			t.Errorf("Encode #%d error %v", i, err)
 			continue
@@ -214,7 +211,7 @@ func TestVersionWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var msg bmwire.MsgVersion
 		rbuf := bytes.NewBuffer(test.buf)
-		err = msg.Decode(rbuf, test.pver)
+		err = msg.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
@@ -230,13 +227,12 @@ func TestVersionWire(t *testing.T) {
 // TestVersionWireErrors performs negative tests against bmwire.encode and
 // decode of MsgGetHeaders to confirm error paths work correctly.
 func TestVersionWireErrors(t *testing.T) {
-	pver := uint32(3)
 	wireErr := &bmwire.MessageError{}
 
 	// Ensure calling MsgVersion.Decode with a non *bytes.Buffer returns
 	// error.
 	fr := newFixedReader(0, []byte{})
-	if err := baseVersion.Decode(fr, pver); err == nil {
+	if err := baseVersion.Decode(fr); err == nil {
 		t.Errorf("Did not received error when calling " +
 			"MsgVersion.Decode with non *bytes.Buffer")
 	}
@@ -249,7 +245,7 @@ func TestVersionWireErrors(t *testing.T) {
 
 	// Encode the new UA length as a varint.
 	var newUAVarIntBuf bytes.Buffer
-	err := bmwire.TstWriteVarInt(&newUAVarIntBuf, pver, uint64(len(newUA)))
+	err := bmwire.TstWriteVarInt(&newUAVarIntBuf, uint64(len(newUA)))
 	if err != nil {
 		t.Errorf("writeVarInt: error %v", err)
 	}
@@ -268,40 +264,39 @@ func TestVersionWireErrors(t *testing.T) {
 	tests := []struct {
 		in       *bmwire.MsgVersion // Value to encode
 		buf      []byte             // Wire encoding
-		pver     uint32             // Protocol version for bmwire.encoding
 		max      int                // Max size of fixed buffer to induce errors
 		writeErr error              // Expected write error
 		readErr  error              // Expected read error
 	}{
 		// Force error in protocol version.
-		{baseVersion, baseVersionEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in services.
-		{baseVersion, baseVersionEncoded, pver, 4, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 4, io.ErrShortWrite, io.EOF},
 		// Force error in timestamp.
-		{baseVersion, baseVersionEncoded, pver, 12, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 12, io.ErrShortWrite, io.EOF},
 		// Force error in remote address.
-		{baseVersion, baseVersionEncoded, pver, 20, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 20, io.ErrShortWrite, io.EOF},
 		// Force error in local address.
-		{baseVersion, baseVersionEncoded, pver, 47, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, 47, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in nonce.
-		{baseVersion, baseVersionEncoded, pver, 73, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, 73, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in user agent length.
-		{baseVersion, baseVersionEncoded, pver, 81, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 81, io.ErrShortWrite, io.EOF},
 		// Force error in user agent.
-		{baseVersion, baseVersionEncoded, pver, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
+		{baseVersion, baseVersionEncoded, 82, io.ErrShortWrite, io.ErrUnexpectedEOF},
 		// Force error in validating user agent
-		{exceedUAVer, exceedUAVerEncoded, pver, newLen, wireErr, wireErr},
+		{exceedUAVer, exceedUAVerEncoded, newLen, wireErr, wireErr},
 		// Force error in stream numbers length.
-		{baseVersion, baseVersionEncoded, pver, 99, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 99, io.ErrShortWrite, io.EOF},
 		// Force error in stream number.
-		{baseVersion, baseVersionEncoded, pver, 100, io.ErrShortWrite, io.EOF},
+		{baseVersion, baseVersionEncoded, 100, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
-		err := test.in.Encode(w, test.pver)
+		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -321,7 +316,7 @@ func TestVersionWireErrors(t *testing.T) {
 		// Decode from bmwire.format.
 		var msg bmwire.MsgVersion
 		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.Decode(buf, test.pver)
+		err = msg.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)

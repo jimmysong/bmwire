@@ -76,17 +76,15 @@ func TestInvVectWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   bmwire.InvVect // NetAddress to encode
-		out  bmwire.InvVect // Expected decoded NetAddress
-		buf  []byte         // Wire encoding
-		pver uint32         // Protocol version for bmwire.encoding
+		in  bmwire.InvVect // NetAddress to encode
+		out bmwire.InvVect // Expected decoded NetAddress
+		buf []byte         // Wire encoding
 	}{
 		// Latest protocol version error inventory vector.
 		{
 			errInvVect,
 			errInvVect,
 			errInvVectEncoded,
-			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version tx inventory vector.
@@ -94,7 +92,6 @@ func TestInvVectWire(t *testing.T) {
 			txInvVect,
 			txInvVect,
 			txInvVectEncoded,
-			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version block inventory vector.
@@ -102,7 +99,6 @@ func TestInvVectWire(t *testing.T) {
 			blockInvVect,
 			blockInvVect,
 			blockInvVectEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -110,7 +106,7 @@ func TestInvVectWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		var buf bytes.Buffer
-		err := bmwire.TstWriteInvVect(&buf, test.pver, &test.in)
+		err := bmwire.TstWriteInvVect(&buf, &test.in)
 		if err != nil {
 			t.Errorf("writeInvVect #%d error %v", i, err)
 			continue
@@ -124,7 +120,7 @@ func TestInvVectWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var iv bmwire.InvVect
 		rbuf := bytes.NewReader(test.buf)
-		err = bmwire.TstReadInvVect(rbuf, test.pver, &iv)
+		err = bmwire.TstReadInvVect(rbuf, &iv)
 		if err != nil {
 			t.Errorf("readInvVect #%d error %v", i, err)
 			continue

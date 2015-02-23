@@ -14,7 +14,7 @@ import (
 // a single byte variable length integer.
 func BenchmarkWriteVarInt1(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 1)
+		writeVarInt(ioutil.Discard, 1)
 	}
 }
 
@@ -22,7 +22,7 @@ func BenchmarkWriteVarInt1(b *testing.B) {
 // a three byte variable length integer.
 func BenchmarkWriteVarInt3(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 65535)
+		writeVarInt(ioutil.Discard, 65535)
 	}
 }
 
@@ -30,7 +30,7 @@ func BenchmarkWriteVarInt3(b *testing.B) {
 // a five byte variable length integer.
 func BenchmarkWriteVarInt5(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 4294967295)
+		writeVarInt(ioutil.Discard, 4294967295)
 	}
 }
 
@@ -38,7 +38,7 @@ func BenchmarkWriteVarInt5(b *testing.B) {
 // a nine byte variable length integer.
 func BenchmarkWriteVarInt9(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarInt(ioutil.Discard, 0, 18446744073709551615)
+		writeVarInt(ioutil.Discard, 18446744073709551615)
 	}
 }
 
@@ -47,7 +47,7 @@ func BenchmarkWriteVarInt9(b *testing.B) {
 func BenchmarkReadVarInt1(b *testing.B) {
 	buf := []byte{0x01}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf))
 	}
 }
 
@@ -56,7 +56,7 @@ func BenchmarkReadVarInt1(b *testing.B) {
 func BenchmarkReadVarInt3(b *testing.B) {
 	buf := []byte{0x0fd, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf))
 	}
 }
 
@@ -65,7 +65,7 @@ func BenchmarkReadVarInt3(b *testing.B) {
 func BenchmarkReadVarInt5(b *testing.B) {
 	buf := []byte{0xfe, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf))
 	}
 }
 
@@ -74,7 +74,7 @@ func BenchmarkReadVarInt5(b *testing.B) {
 func BenchmarkReadVarInt9(b *testing.B) {
 	buf := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	for i := 0; i < b.N; i++ {
-		readVarInt(bytes.NewReader(buf), 0)
+		readVarInt(bytes.NewReader(buf))
 	}
 }
 
@@ -83,7 +83,7 @@ func BenchmarkReadVarInt9(b *testing.B) {
 func BenchmarkReadVarStr4(b *testing.B) {
 	buf := []byte{0x04, 't', 'e', 's', 't'}
 	for i := 0; i < b.N; i++ {
-		readVarString(bytes.NewReader(buf), 0)
+		readVarString(bytes.NewReader(buf))
 	}
 }
 
@@ -92,7 +92,7 @@ func BenchmarkReadVarStr4(b *testing.B) {
 func BenchmarkReadVarStr10(b *testing.B) {
 	buf := []byte{0x0a, 't', 'e', 's', 't', '0', '1', '2', '3', '4', '5'}
 	for i := 0; i < b.N; i++ {
-		readVarString(bytes.NewReader(buf), 0)
+		readVarString(bytes.NewReader(buf))
 	}
 }
 
@@ -100,7 +100,7 @@ func BenchmarkReadVarStr10(b *testing.B) {
 // four byte variable length string.
 func BenchmarkWriteVarStr4(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarString(ioutil.Discard, 0, "test")
+		writeVarString(ioutil.Discard, "test")
 	}
 }
 
@@ -108,6 +108,6 @@ func BenchmarkWriteVarStr4(b *testing.B) {
 // ten byte variable length string.
 func BenchmarkWriteVarStr10(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		writeVarString(ioutil.Discard, 0, "test012345")
+		writeVarString(ioutil.Discard, "test012345")
 	}
 }

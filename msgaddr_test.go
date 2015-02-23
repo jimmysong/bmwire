@@ -18,8 +18,6 @@ import (
 
 // TestAddr tests the MsgAddr API.
 func TestAddr(t *testing.T) {
-	pver := bmwire.ProtocolVersion
-
 	// Ensure the command is expected value.
 	wantCmd := "addr"
 	msg := bmwire.NewMsgAddr()
@@ -31,11 +29,10 @@ func TestAddr(t *testing.T) {
 	// Ensure max payload is expected value for latest protocol version.
 	// Num addresses (varInt) + max allowed addresses.
 	wantPayload := uint32(30009)
-	maxPayload := msg.MaxPayloadLength(pver)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"- got %v, want %v", maxPayload, wantPayload)
 	}
 
 	// Ensure NetAddresses are added properly.
@@ -121,17 +118,15 @@ func TestAddrWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *bmwire.MsgAddr // Message to encode
-		out  *bmwire.MsgAddr // Expected decoded message
-		buf  []byte          // Wire encoding
-		pver uint32          // Protocol version for bmwire.encoding
+		in  *bmwire.MsgAddr // Message to encode
+		out *bmwire.MsgAddr // Expected decoded message
+		buf []byte          // Wire encoding
 	}{
 		// Latest protocol version with no addresses.
 		{
 			noAddr,
 			noAddr,
 			noAddrEncoded,
-			bmwire.ProtocolVersion,
 		},
 
 		// Latest protocol version with multiple addresses.
@@ -139,7 +134,6 @@ func TestAddrWire(t *testing.T) {
 			multiAddr,
 			multiAddr,
 			multiAddrEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -147,7 +141,7 @@ func TestAddrWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
-		err := test.in.Encode(&buf, test.pver)
+		err := test.in.Encode(&buf)
 		if err != nil {
 			t.Errorf("Encode #%d error %v", i, err)
 			continue
@@ -161,7 +155,7 @@ func TestAddrWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var msg bmwire.MsgAddr
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf, test.pver)
+		err = msg.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
@@ -177,7 +171,6 @@ func TestAddrWire(t *testing.T) {
 // TestAddrWireErrors performs negative tests against bmwire.encode and decode
 // of MsgAddr to confirm error paths work correctly.
 func TestAddrWireErrors(t *testing.T) {
-	pver := bmwire.ProtocolVersion
 	wireErr := &bmwire.MessageError{}
 
 	// A couple of NetAddresses to use for testing.
@@ -226,25 +219,24 @@ func TestAddrWireErrors(t *testing.T) {
 	tests := []struct {
 		in       *bmwire.MsgAddr // Value to encode
 		buf      []byte          // Wire encoding
-		pver     uint32          // Protocol version for bmwire.encoding
 		max      int             // Max size of fixed buffer to induce errors
 		writeErr error           // Expected write error
 		readErr  error           // Expected read error
 	}{
 		// Latest protocol version with intentional read/write errors.
 		// Force error in addresses count
-		{baseAddr, baseAddrEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseAddr, baseAddrEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in address list.
-		{baseAddr, baseAddrEncoded, pver, 1, io.ErrShortWrite, io.EOF},
+		{baseAddr, baseAddrEncoded, 1, io.ErrShortWrite, io.EOF},
 		// Force error with greater than max inventory vectors.
-		{maxAddr, maxAddrEncoded, pver, 3, wireErr, wireErr},
+		{maxAddr, maxAddrEncoded, 3, wireErr, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
-		err := test.in.Encode(w, test.pver)
+		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -264,7 +256,7 @@ func TestAddrWireErrors(t *testing.T) {
 		// Decode from bmwire.format.
 		var msg bmwire.MsgAddr
 		r := newFixedReader(test.max, test.buf)
-		err = msg.Decode(r, test.pver)
+		err = msg.Decode(r)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)

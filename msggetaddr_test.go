@@ -15,8 +15,6 @@ import (
 
 // TestGetAddr tests the MsgGetAddr API.
 func TestGetAddr(t *testing.T) {
-	pver := bmwire.ProtocolVersion
-
 	// Ensure the command is expected value.
 	wantCmd := "getaddr"
 	msg := bmwire.NewMsgGetAddr()
@@ -28,11 +26,10 @@ func TestGetAddr(t *testing.T) {
 	// Ensure max payload is expected value for latest protocol version.
 	// Num addresses (varInt) + max allowed addresses.
 	wantPayload := uint32(0)
-	maxPayload := msg.MaxPayloadLength(pver)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"got %v, want %v", maxPayload, wantPayload)
 	}
 
 	return
@@ -45,17 +42,15 @@ func TestGetAddrWire(t *testing.T) {
 	msgGetAddrEncoded := []byte{}
 
 	tests := []struct {
-		in   *bmwire.MsgGetAddr // Message to encode
-		out  *bmwire.MsgGetAddr // Expected decoded message
-		buf  []byte             // Wire encoding
-		pver uint32             // Protocol version for bmwire.encoding
+		in  *bmwire.MsgGetAddr // Message to encode
+		out *bmwire.MsgGetAddr // Expected decoded message
+		buf []byte             // Wire encoding
 	}{
 		// Latest protocol version.
 		{
 			msgGetAddr,
 			msgGetAddr,
 			msgGetAddrEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -63,7 +58,7 @@ func TestGetAddrWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
-		err := test.in.Encode(&buf, test.pver)
+		err := test.in.Encode(&buf)
 		if err != nil {
 			t.Errorf("Encode #%d error %v", i, err)
 			continue
@@ -77,7 +72,7 @@ func TestGetAddrWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var msg bmwire.MsgGetAddr
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf, test.pver)
+		err = msg.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue

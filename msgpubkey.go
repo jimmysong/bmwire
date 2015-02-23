@@ -23,18 +23,18 @@ type MsgPubKey struct {
 	Version      uint64
 	StreamNumber uint64
 	Behavior     uint32
-	SigningKey   PubKey
-	EncryptKey   PubKey
+	SigningKey   *PubKey
+	EncryptKey   *PubKey
 	NonceTrials  uint64
 	ExtraBytes   uint64
 	Signature    []byte
-	Tag          ShaHash
+	Tag          *ShaHash
 	Encrypted    []byte
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgPubKey) Decode(r io.Reader, pver uint32) error {
+func (msg *MsgPubKey) Decode(r io.Reader) error {
 	var sec int64
 	err := readElements(r, &msg.Nonce, &sec, &msg.ObjectType)
 	if err != nil {
@@ -48,50 +48,96 @@ func (msg *MsgPubKey) Decode(r io.Reader, pver uint32) error {
 	}
 
 	msg.ExpiresTime = time.Unix(sec, 0)
-	msg.Version, err = readVarInt(r, pver)
+	msg.Version, err = readVarInt(r)
 	if err != nil {
 		return err
 	}
 
-	msg.StreamNumber, err = readVarInt(r, pver)
+	msg.StreamNumber, err = readVarInt(r)
 	if err != nil {
 		return err
 	}
+
+	msg.SigningKey, _ = NewPubKey(make([]byte, 64))
+	msg.EncryptKey, _ = NewPubKey(make([]byte, 64))
 
 	if msg.Version >= EncryptedPubKeyVersion {
-		err = readElement(r, &msg.Tag)
+		if err = readElement(r, &msg.Tag); err != nil {
+			return err
+		}
+		// The rest is the encrypted data, accessible only to the holder
+		// of the private key to whom it's addressed.
+		if _, err = io.ReadFull(r, msg.Encrypted); err != nil {
+			return err
+		}
+	} else if msg.Version == ExtendedPubKeyVersion {
+		var sigLength uint64
+		err = readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptKey,
+			&msg.NonceTrials, &msg.ExtraBytes, &sigLength,
+		)
 		if err != nil {
 			return err
 		}
-
-	} else if msg.Version == ExtendedPubKeyVersion {
-
-	} else {
-
+		if _, err = io.ReadAtLeast(r, msg.Signature, int(sigLength)); err != nil {
+			return err
+		}
 	}
 
-	return err
+	return readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptKey)
 }
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgPubKey) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgPubKey) Encode(w io.Writer) error {
 	err := writeElements(w, msg.Nonce, msg.ExpiresTime.Unix(), msg.ObjectType)
 	if err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, pver, msg.Version)
+	err = writeVarInt(w, msg.Version)
 	if err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, pver, msg.StreamNumber)
+	err = writeVarInt(w, msg.StreamNumber)
 	if err != nil {
 		return err
 	}
 
-	return err
+	if msg.Version >= EncryptedPubKeyVersion {
+		if err = writeElement(w, &msg.Tag); err != nil {
+			return err
+		}
+		// The rest is the encrypted data, accessible only to the holder
+		// of the private key to whom it's addressed.
+		if _, err = w.Write(msg.Encrypted); err != nil {
+			return err
+		}
+	} else if msg.Version == ExtendedPubKeyVersion {
+		err = writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptKey)
+		if err != nil {
+			return err
+		}
+		err = writeVarInt(w, msg.NonceTrials)
+		if err != nil {
+			return err
+		}
+		err = writeVarInt(w, msg.ExtraBytes)
+		if err != nil {
+			return err
+		}
+		sigLength := uint64(len(msg.Signature))
+		err = writeVarInt(w, sigLength)
+		if err != nil {
+			return err
+		}
+
+		if _, err = w.Write(msg.Signature); err != nil {
+			return err
+		}
+	}
+
+	return writeElements(w, &msg.Behavior, msg.SigningKey, msg.EncryptKey)
 }
 
 // Command returns the protocol command string for the message.  This is part
@@ -102,8 +148,8 @@ func (msg *MsgPubKey) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgPubKey) MaxPayloadLength(pver uint32) uint32 {
-	return uint32(8 + 8 + 4 + 8 + 8 + 32)
+func (msg *MsgPubKey) MaxPayloadLength() uint32 {
+	return 1 << 18
 }
 
 // NewMsgPubKey returns a new object message that conforms to the
@@ -111,15 +157,15 @@ func (msg *MsgPubKey) MaxPayloadLength(pver uint32) uint32 {
 // fields.
 func NewMsgPubKey(nonce uint64, expires time.Time,
 	version, streamNumber uint64, behavior uint32,
-	signingKey, encryptKey PubKey, nonceTrials, extraBytes uint64,
-	signature []byte, tag ShaHash) *MsgPubKey {
+	signingKey, encryptKey *PubKey, nonceTrials, extraBytes uint64,
+	signature []byte, tag *ShaHash, encrypted []byte) *MsgPubKey {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &MsgPubKey{
 		Nonce:        nonce,
 		ExpiresTime:  expires,
-		ObjectType:   ObjectTypeGetPubKey,
+		ObjectType:   ObjectTypePubKey,
 		Version:      version,
 		StreamNumber: streamNumber,
 		Behavior:     behavior,
@@ -129,5 +175,6 @@ func NewMsgPubKey(nonce uint64, expires time.Time,
 		ExtraBytes:   extraBytes,
 		Signature:    signature,
 		Tag:          tag,
+		Encrypted:    encrypted,
 	}
 }

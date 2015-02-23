@@ -5,50 +5,158 @@
 package bmwire_test
 
 import (
+	"bytes"
+	"reflect"
 	"testing"
 	"time"
 
-	//	"github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jimmysong/bmwire"
 )
 
 // TestPubKey tests the MsgPubKey API.
 func TestPubKey(t *testing.T) {
 
-	pver := bmwire.ProtocolVersion
-
 	// Ensure the command is expected value.
 	wantCmd := "object"
 	now := time.Now()
-	var ripe [20]byte
-	var tag [32]byte
-	msg := bmwire.NewMsgGetPubKey(83928, now, 2, 1, ripe, tag)
+	msg := bmwire.NewMsgPubKey(83928, now, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
 	if cmd := msg.Command(); cmd != wantCmd {
-		t.Errorf("NewMsgGetPubKey: wrong command - got %v want %v",
+		t.Errorf("NewMsgPubKey: wrong command - got %v want %v",
 			cmd, wantCmd)
 	}
 
 	// Ensure max payload is expected value for latest protocol version.
 	// Num objectentory vectors (varInt) + max allowed objectentory vectors.
-	wantPayload := uint32(68)
-	maxPayload := msg.MaxPayloadLength(pver)
+	wantPayload := uint32(1 << 18)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"- got %v, want %v", maxPayload, wantPayload)
 	}
 
 	return
 
 }
 
-// TestPubKeyWire tests the MsgPubKey bmwire.encode and decode for various numbers
-// of objectentory vectors and protocol versions.
+// TestPubKeyWire tests the MsgPubKey bmwire.encode and decode for
+// various versions.
 func TestPubKeyWire(t *testing.T) {
+	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
+	sig := make([]byte, 64)
+	encrypted := make([]byte, 512)
+	msgBase := bmwire.NewMsgPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
+	msgExpanded := bmwire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgEncrypted := bmwire.NewMsgPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, nil, encrypted)
+
+	expandedEncoded := []byte{
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
+		0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
+		0x00, 0x00, 0x00, 0x01, // Object Type
+		0x03,                   // Version
+		0x01,                   // Stream Number
+		0x00, 0x00, 0x00, 0x00, // Behavior
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Signing Key
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Encrypt Key
+		0x00, // nonce trials per byte
+		0x00, // extra bytes
+		0x40, // sig length
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sig
+	}
+
+	encryptedEncoded := basePubKeyEncoded[:]
+
+	tests := []struct {
+		in  *bmwire.MsgPubKey // Message to encode
+		out *bmwire.MsgPubKey // Expected decoded message
+		buf []byte            // Wire encoding
+	}{
+		// Latest protocol version with multiple object vectors.
+		{
+			msgBase,
+			msgBase,
+			basePubKeyEncoded,
+		},
+		{
+			msgExpanded,
+			msgExpanded,
+			expandedEncoded,
+		},
+		{
+			msgEncrypted,
+			msgEncrypted,
+			encryptedEncoded,
+		},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode the message to bmwire.format.
+		var buf bytes.Buffer
+		err := test.in.Encode(&buf)
+		if err != nil {
+			t.Errorf("Encode #%d error %v", i, err)
+			continue
+		}
+		if !bytes.Equal(buf.Bytes(), test.buf) {
+			t.Errorf("Encode #%d\n got: %s want: %s", i,
+				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
+			continue
+		}
+
+		// Decode the message from bmwire.format.
+		var msg bmwire.MsgPubKey
+		rbuf := bytes.NewReader(test.buf)
+		err = msg.Decode(rbuf)
+		if err != nil {
+			t.Errorf("Decode #%d error %v", i, err)
+			continue
+		}
+		if !reflect.DeepEqual(&msg, test.out) {
+			t.Errorf("Decode #%d\n got: %s want: %s", i,
+				spew.Sdump(msg), spew.Sdump(test.out))
+			continue
+		}
+	}
 }
 
 // TestPubKeyWireError tests the MsgPubKey error paths
 func TestPubKeyWireError(t *testing.T) {
+}
+
+var pubKey1 = &bmwire.PubKey{
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+var pubKey2 = &bmwire.PubKey{
+	1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
 // basePubKey is used in the various tests as a baseline MsgPubKey.
@@ -59,16 +167,16 @@ var basePubKey = &bmwire.MsgPubKey{
 	Version:      2,
 	StreamNumber: 1,
 	Behavior:     0,
-	SigningKey:   [64]byte{},
-	EncryptKey:   [64]byte{},
+	SigningKey:   pubKey1,
+	EncryptKey:   pubKey2,
 }
 
 // basePubKeyEncoded is the bmwire.encoded bytes for basePubKey
 // using version 2 (pre-tag)
 var basePubKeyEncoded = []byte{
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xe0, 0xf3, // Nonce
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
 	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
-	0x01, 0x00, 0x00, 0x00, // Object Type
+	0x00, 0x00, 0x00, 0x01, // Object Type
 	0x02,                   // Version
 	0x01,                   // Stream Number
 	0x00, 0x00, 0x00, 0x00, // Behavior
@@ -80,7 +188,7 @@ var basePubKeyEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Signing Key
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

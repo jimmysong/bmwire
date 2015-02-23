@@ -17,14 +17,17 @@ import (
 
 // TestGetPubKey tests the MsgGetPubKey API.
 func TestGetPubKey(t *testing.T) {
-	pver := bmwire.ProtocolVersion
-
 	// Ensure the command is expected value.
 	wantCmd := "object"
 	now := time.Now()
-	var ripe [20]byte
-	var tag [32]byte
-	msg := bmwire.NewMsgGetPubKey(83928, now, 2, 1, ripe, tag)
+	// ripe-based getpubkey message
+	ripeBytes := make([]byte, 20)
+	ripeBytes[0] = 1
+	ripe, err := bmwire.NewRipeHash(ripeBytes)
+	if err != nil {
+		t.Fatalf("could not make a ripe hash %s", err)
+	}
+	msg := bmwire.NewMsgGetPubKey(83928, now, 2, 1, ripe, nil)
 	if cmd := msg.Command(); cmd != wantCmd {
 		t.Errorf("NewMsgGetPubKey: wrong command - got %v want %v",
 			cmd, wantCmd)
@@ -32,12 +35,11 @@ func TestGetPubKey(t *testing.T) {
 
 	// Ensure max payload is expected value for latest protocol version.
 	// Num objectentory vectors (varInt) + max allowed objectentory vectors.
-	wantPayload := uint32(68)
-	maxPayload := msg.MaxPayloadLength(pver)
+	wantPayload := uint32(1 << 18)
+	maxPayload := msg.MaxPayloadLength()
 	if maxPayload != wantPayload {
 		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"protocol version %d - got %v, want %v", pver,
-			maxPayload, wantPayload)
+			"got %v, want %v", maxPayload, wantPayload)
 	}
 
 	return
@@ -47,18 +49,26 @@ func TestGetPubKey(t *testing.T) {
 // of objectentory vectors and protocol versions.
 func TestGetPubKeyWire(t *testing.T) {
 
-	var ripe bmwire.RipeHash
-	var tag bmwire.ShaHash
+	ripeBytes := make([]byte, 20)
+	ripeBytes[0] = 1
+	ripe, err := bmwire.NewRipeHash(ripeBytes)
+	if err != nil {
+		t.Fatalf("could not make a ripe hash %s", err)
+	}
+
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 
 	// empty tag, something in ripe
-	ripe[0] = 1
-	msgRipe := bmwire.NewMsgGetPubKey(83928, expires, 2, 1, ripe, tag)
+	msgRipe := bmwire.NewMsgGetPubKey(83928, expires, 2, 1, ripe, nil)
 
 	// empty ripe, something in tag
-	ripe[0] = 0
-	tag[0] = 1
-	msgTag := bmwire.NewMsgGetPubKey(83928, expires, 4, 1, ripe, tag)
+	tagBytes := make([]byte, 32)
+	tagBytes[0] = 1
+	tag, err := bmwire.NewShaHash(tagBytes)
+	if err != nil {
+		t.Fatalf("could not make a tag hash %s", err)
+	}
+	msgTag := bmwire.NewMsgGetPubKey(83928, expires, 4, 1, nil, tag)
 
 	RipeEncoded := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
@@ -84,23 +94,20 @@ func TestGetPubKeyWire(t *testing.T) {
 	}
 
 	tests := []struct {
-		in   *bmwire.MsgGetPubKey // Message to encode
-		out  *bmwire.MsgGetPubKey // Expected decoded message
-		buf  []byte               // Wire encoding
-		pver uint32               // Protocol version for bmwire.encoding
+		in  *bmwire.MsgGetPubKey // Message to encode
+		out *bmwire.MsgGetPubKey // Expected decoded message
+		buf []byte               // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
 			msgRipe,
 			msgRipe,
 			RipeEncoded,
-			bmwire.ProtocolVersion,
 		},
 		{
 			msgTag,
 			msgTag,
 			TagEncoded,
-			bmwire.ProtocolVersion,
 		},
 	}
 
@@ -108,7 +115,7 @@ func TestGetPubKeyWire(t *testing.T) {
 	for i, test := range tests {
 		// Encode the message to bmwire.format.
 		var buf bytes.Buffer
-		err := test.in.Encode(&buf, test.pver)
+		err := test.in.Encode(&buf)
 		if err != nil {
 			t.Errorf("Encode #%d error %v", i, err)
 			continue
@@ -122,7 +129,7 @@ func TestGetPubKeyWire(t *testing.T) {
 		// Decode the message from bmwire.format.
 		var msg bmwire.MsgGetPubKey
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf, test.pver)
+		err = msg.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
@@ -137,13 +144,12 @@ func TestGetPubKeyWire(t *testing.T) {
 
 // TestGetPubKeyWireError tests the MsgGetPubKey error paths
 func TestGetPubKeyWireError(t *testing.T) {
-	pver := uint32(3)
 	wireErr := &bmwire.MessageError{}
 
 	// Ensure calling MsgVersion.Decode with a non *bytes.Buffer returns
 	// error.
 	fr := newFixedReader(0, []byte{})
-	if err := baseVersion.Decode(fr, pver); err == nil {
+	if err := baseVersion.Decode(fr); err == nil {
 		t.Errorf("Did not received error when calling " +
 			"MsgVersion.Decode with non *bytes.Buffer")
 	}
@@ -151,34 +157,33 @@ func TestGetPubKeyWireError(t *testing.T) {
 	tests := []struct {
 		in       *bmwire.MsgGetPubKey // Value to encode
 		buf      []byte               // Wire encoding
-		pver     uint32               // Protocol version for bmwire.encoding
 		max      int                  // Max size of fixed buffer to induce errors
 		writeErr error                // Expected write error
 		readErr  error                // Expected read error
 	}{
 		// Force error in nonce
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 0, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in expirestime.
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 8, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 8, io.ErrShortWrite, io.EOF},
 		// Force error in object type.
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 16, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 16, io.ErrShortWrite, io.EOF},
 		// Force error in version.
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 20, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 20, io.ErrShortWrite, io.EOF},
 		// Force error in stream number.
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 21, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 21, io.ErrShortWrite, io.EOF},
 		// Force error in ripe.
-		{baseGetPubKey, baseGetPubKeyEncoded, pver, 22, io.ErrShortWrite, io.EOF},
+		{baseGetPubKey, baseGetPubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
 		// Force error in tag.
-		{tagGetPubKey, tagGetPubKeyEncoded, pver, 22, io.ErrShortWrite, io.EOF},
+		{tagGetPubKey, tagGetPubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
 		// Force error object type validation.
-		{baseGetPubKey, basePubKeyEncoded, pver, 20, io.ErrShortWrite, wireErr},
+		{baseGetPubKey, basePubKeyEncoded, 20, io.ErrShortWrite, wireErr},
 	}
 
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to bmwire.format.
 		w := newFixedWriter(test.max)
-		err := test.in.Encode(w, test.pver)
+		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
 				i, err, test.writeErr)
@@ -198,7 +203,7 @@ func TestGetPubKeyWireError(t *testing.T) {
 		// Decode from bmwire.format.
 		var msg bmwire.MsgGetPubKey
 		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.Decode(buf, test.pver)
+		err = msg.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -224,8 +229,8 @@ var baseGetPubKey = &bmwire.MsgGetPubKey{
 	ObjectType:   bmwire.ObjectTypeGetPubKey,
 	Version:      3,
 	StreamNumber: 1,
-	Ripe:         [20]byte{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	Tag:          [32]byte{},
+	Ripe:         &bmwire.RipeHash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	Tag:          nil,
 }
 
 // baseGetPubKeyEncoded is the bmwire.encoded bytes for baseGetPubKey
@@ -248,8 +253,10 @@ var tagGetPubKey = &bmwire.MsgGetPubKey{
 	ObjectType:   bmwire.ObjectTypeGetPubKey,
 	Version:      4,
 	StreamNumber: 1,
-	Ripe:         [20]byte{},
-	Tag:          [32]byte{1},
+	Ripe:         nil,
+	Tag: &bmwire.ShaHash{
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 }
 
 // baseGetPubKeyEncoded is the bmwire.encoded bytes for baseGetPubKey

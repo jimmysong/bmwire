@@ -111,6 +111,13 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
+	case *PubKey:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
 	case *ServiceFlag:
 		b := scratch[0:8]
 		_, err := io.ReadFull(r, b)
@@ -241,6 +248,13 @@ func writeElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
+	case *PubKey:
+		_, err := w.Write(e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
 	case ServiceFlag:
 		b := scratch[0:8]
 		binary.BigEndian.PutUint64(b, uint64(e))
@@ -278,7 +292,7 @@ func writeElements(w io.Writer, elements ...interface{}) error {
 }
 
 // readVarInt reads a variable length integer from r and returns it as a uint64.
-func readVarInt(r io.Reader, pver uint32) (uint64, error) {
+func readVarInt(r io.Reader) (uint64, error) {
 	var b [8]byte
 	_, err := io.ReadFull(r, b[0:1])
 	if err != nil {
@@ -318,7 +332,7 @@ func readVarInt(r io.Reader, pver uint32) (uint64, error) {
 
 // writeVarInt serializes val to w using a variable number of bytes depending
 // on its value.
-func writeVarInt(w io.Writer, pver uint32, val uint64) error {
+func writeVarInt(w io.Writer, val uint64) error {
 	if val < 0xfd {
 		_, err := w.Write([]byte{uint8(val)})
 		return err
@@ -377,8 +391,8 @@ func VarIntSerializeSize(val uint64) int {
 // not be possible to put a varString of that size into a block anyways and it
 // also helps protect against memory exhaustion attacks and forced panics
 // through malformed messages.
-func readVarString(r io.Reader, pver uint32) (string, error) {
-	count, err := readVarInt(r, pver)
+func readVarString(r io.Reader) (string, error) {
+	count, err := readVarInt(r)
 	if err != nil {
 		return "", err
 	}
@@ -402,8 +416,8 @@ func readVarString(r io.Reader, pver uint32) (string, error) {
 
 // writeVarString serializes str to w as a varInt containing the length of the
 // string followed by the bytes that represent the string itself.
-func writeVarString(w io.Writer, pver uint32, str string) error {
-	err := writeVarInt(w, pver, uint64(len(str)))
+func writeVarString(w io.Writer, str string) error {
+	err := writeVarInt(w, uint64(len(str)))
 	if err != nil {
 		return err
 	}
@@ -421,10 +435,10 @@ func writeVarString(w io.Writer, pver uint32, str string) error {
 // attacks and forced panics thorugh malformed messages.  The fieldName
 // parameter is only used for the error message so it provides more context in
 // the error.
-func readVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
+func readVarBytes(r io.Reader, maxAllowed uint32,
 	fieldName string) ([]byte, error) {
 
-	count, err := readVarInt(r, pver)
+	count, err := readVarInt(r)
 	if err != nil {
 		return nil, err
 	}
@@ -448,9 +462,9 @@ func readVarBytes(r io.Reader, pver uint32, maxAllowed uint32,
 
 // writeVarInt serializes a variable length byte array to w as a varInt
 // containing the number of bytes, followed by the bytes themselves.
-func writeVarBytes(w io.Writer, pver uint32, bytes []byte) error {
+func writeVarBytes(w io.Writer, bytes []byte) error {
 	slen := uint64(len(bytes))
-	err := writeVarInt(w, pver, slen)
+	err := writeVarInt(w, slen)
 	if err != nil {
 		return err
 	}

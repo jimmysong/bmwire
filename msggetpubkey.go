@@ -22,13 +22,13 @@ type MsgGetPubKey struct {
 	ObjectType   ObjectType
 	Version      uint64
 	StreamNumber uint64
-	Ripe         RipeHash
-	Tag          ShaHash
+	Ripe         *RipeHash
+	Tag          *ShaHash
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetPubKey) Decode(r io.Reader, pver uint32) error {
+func (msg *MsgGetPubKey) Decode(r io.Reader) error {
 	var sec int64
 	err := readElements(r, &msg.Nonce, &sec, &msg.ObjectType)
 	if err != nil {
@@ -42,23 +42,25 @@ func (msg *MsgGetPubKey) Decode(r io.Reader, pver uint32) error {
 	}
 
 	msg.ExpiresTime = time.Unix(sec, 0)
-	msg.Version, err = readVarInt(r, pver)
+	msg.Version, err = readVarInt(r)
 	if err != nil {
 		return err
 	}
 
-	msg.StreamNumber, err = readVarInt(r, pver)
+	msg.StreamNumber, err = readVarInt(r)
 	if err != nil {
 		return err
 	}
 
 	if msg.Version >= TagBasedRipeVersion {
-		err = readElement(r, &msg.Tag)
+		msg.Tag, _ = NewShaHash(make([]byte, 32))
+		err = readElement(r, msg.Tag)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = readElement(r, &msg.Ripe)
+		msg.Ripe, _ = NewRipeHash(make([]byte, 20))
+		err = readElement(r, msg.Ripe)
 		if err != nil {
 			return err
 		}
@@ -69,18 +71,18 @@ func (msg *MsgGetPubKey) Decode(r io.Reader, pver uint32) error {
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetPubKey) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgGetPubKey) Encode(w io.Writer) error {
 	err := writeElements(w, msg.Nonce, msg.ExpiresTime.Unix(), msg.ObjectType)
 	if err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, pver, msg.Version)
+	err = writeVarInt(w, msg.Version)
 	if err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, pver, msg.StreamNumber)
+	err = writeVarInt(w, msg.StreamNumber)
 	if err != nil {
 		return err
 	}
@@ -108,8 +110,8 @@ func (msg *MsgGetPubKey) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetPubKey) MaxPayloadLength(pver uint32) uint32 {
-	return uint32(8 + 8 + 4 + 8 + 8 + 32)
+func (msg *MsgGetPubKey) MaxPayloadLength() uint32 {
+	return 1 << 18
 }
 
 func (msg *MsgGetPubKey) String() string {
@@ -119,7 +121,7 @@ func (msg *MsgGetPubKey) String() string {
 // NewMsgGetPubKey returns a new object message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewMsgGetPubKey(nonce uint64, expires time.Time, version, streamNumber uint64, ripe RipeHash, tag ShaHash) *MsgGetPubKey {
+func NewMsgGetPubKey(nonce uint64, expires time.Time, version, streamNumber uint64, ripe *RipeHash, tag *ShaHash) *MsgGetPubKey {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.

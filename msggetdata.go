@@ -37,8 +37,8 @@ func (msg *MsgGetData) AddInvVect(iv *InvVect) error {
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetData) Decode(r io.Reader, pver uint32) error {
-	count, err := readVarInt(r, pver)
+func (msg *MsgGetData) Decode(r io.Reader) error {
+	count, err := readVarInt(r)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (msg *MsgGetData) Decode(r io.Reader, pver uint32) error {
 	msg.InvList = make([]*InvVect, 0, count)
 	for i := uint64(0); i < count; i++ {
 		iv := InvVect{}
-		err := readInvVect(r, pver, &iv)
+		err := readInvVect(r, &iv)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func (msg *MsgGetData) Decode(r io.Reader, pver uint32) error {
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetData) Encode(w io.Writer, pver uint32) error {
+func (msg *MsgGetData) Encode(w io.Writer) error {
 	// Limit to max inventory vectors per message.
 	count := len(msg.InvList)
 	if count > MaxInvPerMsg {
@@ -72,13 +72,13 @@ func (msg *MsgGetData) Encode(w io.Writer, pver uint32) error {
 		return messageError("MsgGetData.Encode", str)
 	}
 
-	err := writeVarInt(w, pver, uint64(count))
+	err := writeVarInt(w, uint64(count))
 	if err != nil {
 		return err
 	}
 
 	for _, iv := range msg.InvList {
-		err := writeInvVect(w, pver, iv)
+		err := writeInvVect(w, iv)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (msg *MsgGetData) Command() string {
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver.  This is part of the Message interface implementation.
-func (msg *MsgGetData) MaxPayloadLength(pver uint32) uint32 {
+func (msg *MsgGetData) MaxPayloadLength() uint32 {
 	// Num inventory vectors (varInt) + max allowed inventory vectors.
 	return MaxVarIntPayload + (MaxInvPerMsg * maxInvVectPayload)
 }
