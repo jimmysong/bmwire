@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-// MsgGetData implements the Message interface and represents a bitcoin
+// MsgGetData implements the Message interface and represents a bitmessage
 // getdata message.  It is used to request data such as blocks and transactions
 // from another peer.  It should be used in response to the inv (MsgInv) message
 // to request the actual data referenced by each inventory vector the receiving
@@ -35,9 +35,9 @@ func (msg *MsgGetData) AddInvVect(iv *InvVect) error {
 	return nil
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetData) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetData) Decode(r io.Reader, pver uint32) error {
 	count, err := readVarInt(r, pver)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (msg *MsgGetData) BtcDecode(r io.Reader, pver uint32) error {
 	// Limit to max inventory vectors per message.
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgGetData.BtcDecode", str)
+		return messageError("MsgGetData.Decode", str)
 	}
 
 	msg.InvList = make([]*InvVect, 0, count)
@@ -62,14 +62,14 @@ func (msg *MsgGetData) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetData) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetData) Encode(w io.Writer, pver uint32) error {
 	// Limit to max inventory vectors per message.
 	count := len(msg.InvList)
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgGetData.BtcEncode", str)
+		return messageError("MsgGetData.Encode", str)
 	}
 
 	err := writeVarInt(w, pver, uint64(count))
@@ -100,7 +100,7 @@ func (msg *MsgGetData) MaxPayloadLength(pver uint32) uint32 {
 	return MaxVarIntPayload + (MaxInvPerMsg * maxInvVectPayload)
 }
 
-// NewMsgGetData returns a new bitcoin getdata message that conforms to the
+// NewMsgGetData returns a new bitmessage getdata message that conforms to the
 // Message interface.  See MsgGetData for details.
 func NewMsgGetData() *MsgGetData {
 	return &MsgGetData{
@@ -108,7 +108,7 @@ func NewMsgGetData() *MsgGetData {
 	}
 }
 
-// NewMsgGetDataSizeHint returns a new bitcoin getdata message that conforms to
+// NewMsgGetDataSizeHint returns a new bitmessage getdata message that conforms to
 // the Message interface.  See MsgGetData for details.  This function differs
 // from NewMsgGetData in that it allows a default allocation size for the
 // backing array which houses the inventory vector list.  This allows callers

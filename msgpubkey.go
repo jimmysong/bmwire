@@ -32,9 +32,9 @@ type MsgPubKey struct {
 	Encrypted    []byte
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgPubKey) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgPubKey) Decode(r io.Reader, pver uint32) error {
 	var sec int64
 	err := readElements(r, &msg.Nonce, &sec, &msg.ObjectType)
 	if err != nil {
@@ -44,7 +44,7 @@ func (msg *MsgPubKey) BtcDecode(r io.Reader, pver uint32) error {
 	if msg.ObjectType != ObjectTypePubKey {
 		str := fmt.Sprintf("Object Type should be %d, but is %d",
 			ObjectTypePubKey, msg.ObjectType)
-		return messageError("BtcDecode", str)
+		return messageError("Decode", str)
 	}
 
 	msg.ExpiresTime = time.Unix(sec, 0)
@@ -73,9 +73,9 @@ func (msg *MsgPubKey) BtcDecode(r io.Reader, pver uint32) error {
 	return err
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgPubKey) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgPubKey) Encode(w io.Writer, pver uint32) error {
 	err := writeElements(w, msg.Nonce, msg.ExpiresTime.Unix(), msg.ObjectType)
 	if err != nil {
 		return err

@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-// MsgGetAddr implements the Message interface and represents a bitcoin
+// MsgGetAddr implements the Message interface and represents a bitmessage
 // getaddr message.  It is used to request a list of known active peers on the
 // network from a peer to help identify potential nodes.  The list is returned
 // via one or more addr messages (MsgAddr).
@@ -16,15 +16,15 @@ import (
 // This message has no payload.
 type MsgGetAddr struct{}
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgGetAddr) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgGetAddr) Decode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgGetAddr) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgGetAddr) Encode(w io.Writer, pver uint32) error {
 	return nil
 }
 
@@ -40,7 +40,7 @@ func (msg *MsgGetAddr) MaxPayloadLength(pver uint32) uint32 {
 	return 0
 }
 
-// NewMsgGetAddr returns a new bitcoin getaddr message that conforms to the
+// NewMsgGetAddr returns a new bitmessage getaddr message that conforms to the
 // Message interface.  See MsgGetAddr for details.
 func NewMsgGetAddr() *MsgGetAddr {
 	return &MsgGetAddr{}

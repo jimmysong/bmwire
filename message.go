@@ -11,12 +11,12 @@ import (
 	"unicode/utf8"
 )
 
-// MessageHeaderSize is the number of bytes in a bitcoin message header.
-// Bitcoin network (magic) 4 bytes + command 12 bytes + payload length 4 bytes +
-// checksum 4 bytes.
+// MessageHeaderSize is the number of bytes in a bitmessage message header.
+// Bitmessage network (magic) 4 bytes + command 12 bytes +
+// payload length 4 bytes + checksum 4 bytes.
 const MessageHeaderSize = 24
 
-// CommandSize is the fixed size of all commands in the common bitcoin message
+// CommandSize is the fixed size of all commands in the common bitmessage message
 // header.  Shorter commands must be zero padded.
 const CommandSize = 12
 
@@ -24,7 +24,7 @@ const CommandSize = 12
 // individual limits imposed by messages themselves.
 const MaxMessagePayload = (1024 * 1024 * 32) // 32MB
 
-// Commands used in bitcoin message headers which describe the type of message.
+// Commands used in bitmessage message headers which describe the type of message.
 const (
 	CmdVersion = "version"
 	CmdVerAck  = "verack"
@@ -35,13 +35,13 @@ const (
 	CmdObject  = "object"
 )
 
-// Message is an interface that describes a bitcoin message.  A type that
+// Message is an interface that describes a bitmessage message.  A type that
 // implements Message has complete control over the representation of its data
 // and may therefore contain additional or fewer fields than those which
 // are used directly in the protocol encoded message.
 type Message interface {
-	BtcDecode(io.Reader, uint32) error
-	BtcEncode(io.Writer, uint32) error
+	Decode(io.Reader, uint32) error
+	Encode(io.Writer, uint32) error
 	Command() string
 	MaxPayloadLength(uint32) uint32
 }
@@ -75,15 +75,15 @@ func makeEmptyMessage(command string) (Message, error) {
 	return msg, nil
 }
 
-// messageHeader defines the header structure for all bitcoin protocol messages.
+// messageHeader defines the header structure for all bitmessage protocol messages.
 type messageHeader struct {
-	magic    BitcoinNet // 4 bytes
-	command  string     // 12 bytes
-	length   uint32     // 4 bytes
-	checksum [4]byte    // 4 bytes
+	magic    BitmessageNet // 4 bytes
+	command  string        // 12 bytes
+	length   uint32        // 4 bytes
+	checksum [4]byte       // 4 bytes
 }
 
-// readMessageHeader reads a bitcoin message header from r.
+// readMessageHeader reads a bitmessage message header from r.
 func readMessageHeader(r io.Reader) (int, *messageHeader, error) {
 	// Since readElements doesn't return the amount of bytes read, attempt
 	// to read the entire header into a buffer first in case there is a
@@ -127,10 +127,10 @@ func discardInput(r io.Reader, n uint32) {
 	}
 }
 
-// WriteMessageN writes a bitcoin Message to w including the necessary header
+// WriteMessageN writes a bitmessage Message to w including the necessary header
 // information and returns the number of bytes written.    This function is the
 // same as WriteMessage except it also returns the number of bytes written.
-func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (int, error) {
+func WriteMessageN(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) (int, error) {
 	totalBytes := 0
 
 	// Enforce max command size.
@@ -145,7 +145,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 
 	// Encode the message payload.
 	var bw bytes.Buffer
-	err := msg.BtcEncode(&bw, pver)
+	err := msg.Encode(&bw, pver)
 	if err != nil {
 		return totalBytes, err
 	}
@@ -171,7 +171,7 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 
 	// Create header for the message.
 	hdr := messageHeader{}
-	hdr.magic = btcnet
+	hdr.magic = bmnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
 	copy(hdr.checksum[:], Sha512(payload)[0:4])
@@ -202,22 +202,22 @@ func WriteMessageN(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) (in
 	return totalBytes, nil
 }
 
-// WriteMessage writes a bitcoin Message to w including the necessary header
+// WriteMessage writes a bitmessage Message to w including the necessary header
 // information.  This function is the same as WriteMessageN except it doesn't
 // doesn't return the number of bytes written.  This function is mainly provided
 // for backwards compatibility with the original API, but it's also useful for
 // callers that don't care about byte counts.
-func WriteMessage(w io.Writer, msg Message, pver uint32, btcnet BitcoinNet) error {
-	_, err := WriteMessageN(w, msg, pver, btcnet)
+func WriteMessage(w io.Writer, msg Message, pver uint32, bmnet BitmessageNet) error {
+	_, err := WriteMessageN(w, msg, pver, bmnet)
 	return err
 }
 
-// ReadMessageN reads, validates, and parses the next bitcoin Message from r for
-// the provided protocol version and bitcoin network.  It returns the number of
+// ReadMessageN reads, validates, and parses the next bitmessage Message from r for
+// the provided protocol version and bitmessage network.  It returns the number of
 // bytes read in addition to the parsed Message and raw bytes which comprise the
 // message.  This function is the same as ReadMessage except it also returns the
 // number of bytes read.
-func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []byte, error) {
+func ReadMessageN(r io.Reader, pver uint32, bmnet BitmessageNet) (int, Message, []byte, error) {
 	totalBytes := 0
 	n, hdr, err := readMessageHeader(r)
 	if err != nil {
@@ -236,8 +236,8 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 
 	}
 
-	// Check for messages from the wrong bitcoin network.
-	if hdr.magic != btcnet {
+	// Check for messages from the wrong bitmessage network.
+	if hdr.magic != bmnet {
 		discardInput(r, hdr.length)
 		str := fmt.Sprintf("message from other network [%v]", hdr.magic)
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
@@ -349,10 +349,10 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	}
 
 	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
-	// MsgVersion BtcDecode function requires it.
+	// MsgVersion Decode function requires it.
 	pr := bytes.NewBuffer(payload)
 
-	err = msg.BtcDecode(pr, pver)
+	err = msg.Decode(pr, pver)
 	if err != nil {
 		return totalBytes, nil, nil, err
 	}
@@ -360,13 +360,13 @@ func ReadMessageN(r io.Reader, pver uint32, btcnet BitcoinNet) (int, Message, []
 	return totalBytes, msg, payload, nil
 }
 
-// ReadMessage reads, validates, and parses the next bitcoin Message from r for
-// the provided protocol version and bitcoin network.  It returns the parsed
+// ReadMessage reads, validates, and parses the next bitmessage Message from r for
+// the provided protocol version and bitmessage network.  It returns the parsed
 // Message and raw bytes which comprise the message.  This function only differs
 // from ReadMessageN in that it doesn't return the number of bytes read.  This
 // function is mainly provided for backwards compatibility with the original
 // API, but it's also useful for callers that don't care about byte counts.
-func ReadMessage(r io.Reader, pver uint32, btcnet BitcoinNet) (Message, []byte, error) {
-	_, msg, buf, err := ReadMessageN(r, pver, btcnet)
+func ReadMessage(r io.Reader, pver uint32, bmnet BitmessageNet) (Message, []byte, error) {
+	_, msg, buf, err := ReadMessageN(r, pver, bmnet)
 	return msg, buf, err
 }

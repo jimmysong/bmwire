@@ -10,14 +10,14 @@ import (
 
 const (
 	// MaxInvPerMsg is the maximum number of inventory vectors that can be in a
-	// single bitcoin inv message.
+	// single bitmessage inv message.
 	MaxInvPerMsg = 50000
 
 	// Maximum payload size for an inventory vector.
 	maxInvVectPayload = HashSize
 )
 
-// InvVect defines a bitcoin inventory vector which is used to describe data,
+// InvVect defines a bitmessage inventory vector which is used to describe data,
 // as specified by the Type field, that a peer wants, has, or does not have to
 // another peer.
 type InvVect struct {

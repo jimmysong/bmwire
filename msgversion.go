@@ -20,7 +20,7 @@ const MaxUserAgentLen = 2000
 // DefaultUserAgent for bmwire.in the stack
 const DefaultUserAgent = "/bmwire:0.2.0/"
 
-// MsgVersion implements the Message interface and represents a bitcoin version
+// MsgVersion implements the Message interface and represents a bitmessage version
 // message.  It is used for a peer to advertise itself as soon as an outbound
 // connection is made.  The remote peer then uses this information along with
 // its own to negotiate.  The remote peer must then respond with a version
@@ -70,17 +70,17 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 	msg.Services |= service
 }
 
-// BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
+// Decode decodes r using the bitmessage protocol encoding into the receiver.
 // The version message is special in that the protocol version hasn't been
 // negotiated yet.  As a result, the pver field is ignored and any fields which
 // are added in new versions are optional.  This also mean that r must be a
 // *bytes.Buffer so the number of remaining bytes can be ascertained.
 //
 // This is part of the Message interface implementation.
-func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
+func (msg *MsgVersion) Decode(r io.Reader, pver uint32) error {
 	buf, ok := r.(*bytes.Buffer)
 	if !ok {
-		return fmt.Errorf("MsgVersion.BtcDecode reader is not a " +
+		return fmt.Errorf("MsgVersion.Decode reader is not a " +
 			"*bytes.Buffer")
 	}
 
@@ -129,9 +129,9 @@ func (msg *MsgVersion) BtcDecode(r io.Reader, pver uint32) error {
 	return nil
 }
 
-// BtcEncode encodes the receiver to w using the bitcoin protocol encoding.
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
-func (msg *MsgVersion) BtcEncode(w io.Writer, pver uint32) error {
+func (msg *MsgVersion) Encode(w io.Writer, pver uint32) error {
 	err := validateUserAgent(msg.UserAgent)
 	if err != nil {
 		return err
@@ -196,7 +196,7 @@ func (msg *MsgVersion) MaxPayloadLength(pver uint32) uint32 {
 		MaxUserAgentLen
 }
 
-// NewMsgVersion returns a new bitcoin version message that conforms to the
+// NewMsgVersion returns a new bitmessage version message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
 func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64, streams []uint64) *MsgVersion {
@@ -216,7 +216,7 @@ func NewMsgVersion(me *NetAddress, you *NetAddress, nonce uint64, streams []uint
 }
 
 // NewMsgVersionFromConn is a convenience function that extracts the remote
-// and local address from conn and returns a new bitcoin version message that
+// and local address from conn and returns a new bitmessage version message that
 // conforms to the Message interface.  See NewMsgVersion.
 func NewMsgVersionFromConn(conn net.Conn, nonce uint64, streams []uint64) (*MsgVersion, error) {
 

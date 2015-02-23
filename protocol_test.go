@@ -32,14 +32,14 @@ func TestServiceFlagStringer(t *testing.T) {
 	}
 }
 
-// TestBitcoinNetStringer tests the stringized output for bitcoin net types.
-func TestBitcoinNetStringer(t *testing.T) {
+// TestBitmessageNetStringer tests the stringized output for bitmessage net types.
+func TestBitmessageNetStringer(t *testing.T) {
 	tests := []struct {
-		in   bmwire.BitcoinNet
+		in   bmwire.BitmessageNet
 		want string
 	}{
 		{bmwire.MainNet, "MainNet"},
-		{0xffffffff, "Unknown BitcoinNet (4294967295)"},
+		{0xffffffff, "Unknown BitmessageNet (4294967295)"},
 	}
 
 	t.Logf("Running %d tests", len(tests))

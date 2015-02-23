@@ -120,13 +120,13 @@ func readElement(r io.Reader, element interface{}) error {
 		*e = ServiceFlag(binary.BigEndian.Uint64(b))
 		return nil
 
-	case *BitcoinNet:
+	case *BitmessageNet:
 		b := scratch[0:4]
 		_, err := io.ReadFull(r, b)
 		if err != nil {
 			return err
 		}
-		*e = BitcoinNet(binary.BigEndian.Uint32(b))
+		*e = BitmessageNet(binary.BigEndian.Uint32(b))
 		return nil
 	}
 
@@ -250,7 +250,7 @@ func writeElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
-	case BitcoinNet:
+	case BitmessageNet:
 		b := scratch[0:4]
 		binary.BigEndian.PutUint32(b, uint32(e))
 		_, err := w.Write(b)
