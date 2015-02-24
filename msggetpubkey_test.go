@@ -42,6 +42,11 @@ func TestGetPubKey(t *testing.T) {
 			"got %v, want %v", maxPayload, wantPayload)
 	}
 
+	str := msg.String()
+	if str[:9] != "msgobject" {
+		t.Errorf("String representation: got %v, want %v", str[:9], "msgobject")
+	}
+
 	return
 }
 

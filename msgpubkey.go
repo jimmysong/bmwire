@@ -7,6 +7,7 @@ package bmwire
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 )
 
@@ -36,8 +37,8 @@ type MsgPubKey struct {
 // This is part of the Message interface implementation.
 func (msg *MsgPubKey) Decode(r io.Reader) error {
 	var sec int64
-	err := readElements(r, &msg.Nonce, &sec, &msg.ObjectType)
-	if err != nil {
+	var err error
+	if err = readElements(r, &msg.Nonce, &sec, &msg.ObjectType); err != nil {
 		return err
 	}
 
@@ -48,41 +49,47 @@ func (msg *MsgPubKey) Decode(r io.Reader) error {
 	}
 
 	msg.ExpiresTime = time.Unix(sec, 0)
-	msg.Version, err = readVarInt(r)
-	if err != nil {
+	if msg.Version, err = readVarInt(r); err != nil {
 		return err
 	}
 
-	msg.StreamNumber, err = readVarInt(r)
-	if err != nil {
+	if msg.StreamNumber, err = readVarInt(r); err != nil {
+		return err
+	}
+
+	if msg.Version >= EncryptedPubKeyVersion {
+		msg.Tag, _ = NewShaHash(make([]byte, 32))
+		if err = readElement(r, msg.Tag); err != nil {
+			return err
+		}
+		// The rest is the encrypted data, accessible only to the holder
+		// of the private key to whom it's addressed.
+		msg.Encrypted, err = ioutil.ReadAll(r)
+		return err
+	} else if msg.Version == ExtendedPubKeyVersion {
+		msg.SigningKey, _ = NewPubKey(make([]byte, 64))
+		msg.EncryptKey, _ = NewPubKey(make([]byte, 64))
+		var sigLength uint64
+		err = readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptKey)
+		if err != nil {
+			return err
+		}
+		if msg.NonceTrials, err = readVarInt(r); err != nil {
+			return err
+		}
+		if msg.ExtraBytes, err = readVarInt(r); err != nil {
+			return err
+		}
+		if sigLength, err = readVarInt(r); err != nil {
+			return err
+		}
+		msg.Signature = make([]byte, sigLength)
+		_, err = io.ReadFull(r, msg.Signature)
 		return err
 	}
 
 	msg.SigningKey, _ = NewPubKey(make([]byte, 64))
 	msg.EncryptKey, _ = NewPubKey(make([]byte, 64))
-
-	if msg.Version >= EncryptedPubKeyVersion {
-		if err = readElement(r, &msg.Tag); err != nil {
-			return err
-		}
-		// The rest is the encrypted data, accessible only to the holder
-		// of the private key to whom it's addressed.
-		if _, err = io.ReadFull(r, msg.Encrypted); err != nil {
-			return err
-		}
-	} else if msg.Version == ExtendedPubKeyVersion {
-		var sigLength uint64
-		err = readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptKey,
-			&msg.NonceTrials, &msg.ExtraBytes, &sigLength,
-		)
-		if err != nil {
-			return err
-		}
-		if _, err = io.ReadAtLeast(r, msg.Signature, int(sigLength)); err != nil {
-			return err
-		}
-	}
-
 	return readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptKey)
 }
 
@@ -94,47 +101,40 @@ func (msg *MsgPubKey) Encode(w io.Writer) error {
 		return err
 	}
 
-	err = writeVarInt(w, msg.Version)
-	if err != nil {
+	if err = writeVarInt(w, msg.Version); err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, msg.StreamNumber)
-	if err != nil {
+	if err = writeVarInt(w, msg.StreamNumber); err != nil {
 		return err
 	}
 
 	if msg.Version >= EncryptedPubKeyVersion {
-		if err = writeElement(w, &msg.Tag); err != nil {
+		if err = writeElement(w, msg.Tag); err != nil {
 			return err
 		}
 		// The rest is the encrypted data, accessible only to the holder
 		// of the private key to whom it's addressed.
-		if _, err = w.Write(msg.Encrypted); err != nil {
-			return err
-		}
+		_, err = w.Write(msg.Encrypted)
+		return err
+
 	} else if msg.Version == ExtendedPubKeyVersion {
 		err = writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptKey)
 		if err != nil {
 			return err
 		}
-		err = writeVarInt(w, msg.NonceTrials)
-		if err != nil {
+		if err = writeVarInt(w, msg.NonceTrials); err != nil {
 			return err
 		}
-		err = writeVarInt(w, msg.ExtraBytes)
-		if err != nil {
+		if err = writeVarInt(w, msg.ExtraBytes); err != nil {
 			return err
 		}
 		sigLength := uint64(len(msg.Signature))
-		err = writeVarInt(w, sigLength)
-		if err != nil {
+		if err = writeVarInt(w, sigLength); err != nil {
 			return err
 		}
-
-		if _, err = w.Write(msg.Signature); err != nil {
-			return err
-		}
+		_, err = w.Write(msg.Signature)
+		return err
 	}
 
 	return writeElements(w, &msg.Behavior, msg.SigningKey, msg.EncryptKey)

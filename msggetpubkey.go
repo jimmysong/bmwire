@@ -42,26 +42,22 @@ func (msg *MsgGetPubKey) Decode(r io.Reader) error {
 	}
 
 	msg.ExpiresTime = time.Unix(sec, 0)
-	msg.Version, err = readVarInt(r)
-	if err != nil {
+	if msg.Version, err = readVarInt(r); err != nil {
 		return err
 	}
 
-	msg.StreamNumber, err = readVarInt(r)
-	if err != nil {
+	if msg.StreamNumber, err = readVarInt(r); err != nil {
 		return err
 	}
 
 	if msg.Version >= TagBasedRipeVersion {
 		msg.Tag, _ = NewShaHash(make([]byte, 32))
-		err = readElement(r, msg.Tag)
-		if err != nil {
+		if err = readElement(r, msg.Tag); err != nil {
 			return err
 		}
 	} else {
 		msg.Ripe, _ = NewRipeHash(make([]byte, 20))
-		err = readElement(r, msg.Ripe)
-		if err != nil {
+		if err = readElement(r, msg.Ripe); err != nil {
 			return err
 		}
 	}
@@ -77,24 +73,20 @@ func (msg *MsgGetPubKey) Encode(w io.Writer) error {
 		return err
 	}
 
-	err = writeVarInt(w, msg.Version)
-	if err != nil {
+	if err = writeVarInt(w, msg.Version); err != nil {
 		return err
 	}
 
-	err = writeVarInt(w, msg.StreamNumber)
-	if err != nil {
+	if err = writeVarInt(w, msg.StreamNumber); err != nil {
 		return err
 	}
 
 	if msg.Version >= TagBasedRipeVersion {
-		err = writeElement(w, msg.Tag)
-		if err != nil {
+		if err = writeElement(w, msg.Tag); err != nil {
 			return err
 		}
 	} else {
-		err = writeElement(w, msg.Ripe)
-		if err != nil {
+		if err = writeElement(w, msg.Ripe); err != nil {
 			return err
 		}
 	}

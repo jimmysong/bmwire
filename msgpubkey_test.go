@@ -6,6 +6,7 @@ package bmwire_test
 
 import (
 	"bytes"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -47,45 +48,13 @@ func TestPubKeyWire(t *testing.T) {
 	encrypted := make([]byte, 512)
 	msgBase := bmwire.NewMsgPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
 	msgExpanded := bmwire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-	msgEncrypted := bmwire.NewMsgPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, nil, encrypted)
-
-	expandedEncoded := []byte{
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
-		0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
-		0x00, 0x00, 0x00, 0x01, // Object Type
-		0x03,                   // Version
-		0x01,                   // Stream Number
-		0x00, 0x00, 0x00, 0x00, // Behavior
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Signing Key
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Encrypt Key
-		0x00, // nonce trials per byte
-		0x00, // extra bytes
-		0x40, // sig length
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sig
+	tagBytes := make([]byte, 32)
+	tagBytes[0] = 1
+	tag, err := bmwire.NewShaHash(tagBytes)
+	if err != nil {
+		t.Fatalf("could not make a tag hash %s", err)
 	}
-
-	encryptedEncoded := basePubKeyEncoded[:]
+	msgEncrypted := bmwire.NewMsgPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, tag, encrypted)
 
 	tests := []struct {
 		in  *bmwire.MsgPubKey // Message to encode
@@ -101,12 +70,12 @@ func TestPubKeyWire(t *testing.T) {
 		{
 			msgExpanded,
 			msgExpanded,
-			expandedEncoded,
+			expandedPubKeyEncoded,
 		},
 		{
 			msgEncrypted,
 			msgEncrypted,
-			encryptedEncoded,
+			encryptedPubKeyEncoded,
 		},
 	}
 
@@ -143,6 +112,96 @@ func TestPubKeyWire(t *testing.T) {
 
 // TestPubKeyWireError tests the MsgPubKey error paths
 func TestPubKeyWireError(t *testing.T) {
+	wireErr := &bmwire.MessageError{}
+
+	// Ensure calling MsgVersion.Decode with a non *bytes.Buffer returns
+	// error.
+	fr := newFixedReader(0, []byte{})
+	if err := basePubKey.Decode(fr); err == nil {
+		t.Errorf("Did not received error when calling " +
+			"MsgVersion.Decode with non *bytes.Buffer")
+	}
+
+	wrongObjectTypeEncoded := make([]byte, len(basePubKeyEncoded))
+	copy(wrongObjectTypeEncoded, basePubKeyEncoded)
+	wrongObjectTypeEncoded[19] = 0
+
+	tests := []struct {
+		in       *bmwire.MsgPubKey // Value to encode
+		buf      []byte            // Wire encoding
+		max      int               // Max size of fixed buffer to induce errors
+		writeErr error             // Expected write error
+		readErr  error             // Expected read error
+	}{
+		// Force error in nonce
+		{basePubKey, basePubKeyEncoded, 0, io.ErrShortWrite, io.EOF},
+		// Force error in expirestime.
+		{basePubKey, basePubKeyEncoded, 8, io.ErrShortWrite, io.EOF},
+		// Force error in object type.
+		{basePubKey, basePubKeyEncoded, 16, io.ErrShortWrite, io.EOF},
+		// Force error in version.
+		{basePubKey, basePubKeyEncoded, 20, io.ErrShortWrite, io.EOF},
+		// Force error in stream number.
+		{basePubKey, basePubKeyEncoded, 21, io.ErrShortWrite, io.EOF},
+		// Force error object type validation.
+		{basePubKey, wrongObjectTypeEncoded, 52, io.ErrShortWrite, wireErr},
+		// Force error in Tag
+		{basePubKey, encryptedPubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
+		// Force error in Pub Key
+		{basePubKey, expandedPubKeyEncoded, 26, io.ErrShortWrite, io.EOF},
+		// Force error in Nonce Trials
+		{expandedPubKey, expandedPubKeyEncoded, 154, io.ErrShortWrite, io.EOF},
+		// Force error in Extra Bytes
+		{expandedPubKey, expandedPubKeyEncoded, 155, io.ErrShortWrite, io.EOF},
+		// Force error in Sig Length
+		{expandedPubKey, expandedPubKeyEncoded, 156, io.ErrShortWrite, io.EOF},
+		// Force error in writing tag
+		{encryptedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
+		// Force error in writing tag
+		{expandedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
+	}
+
+	t.Logf("Running %d tests", len(tests))
+	for i, test := range tests {
+		// Encode to bmwire.format.
+		w := newFixedWriter(test.max)
+		err := test.in.Encode(w)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
+			t.Errorf("Encode #%d wrong error got: %v, want: %v",
+				i, err, test.writeErr)
+			continue
+		}
+
+		// For errors which are not of type bmwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*bmwire.MessageError); !ok {
+			if err != test.writeErr {
+				t.Errorf("Encode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.writeErr)
+				continue
+			}
+		}
+
+		// Decode from bmwire.format.
+		var msg bmwire.MsgPubKey
+		buf := bytes.NewBuffer(test.buf[0:test.max])
+		err = msg.Decode(buf)
+		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
+			t.Errorf("Decode #%d wrong error got: %v, want: %v",
+				i, err, test.readErr)
+			continue
+		}
+
+		// For errors which are not of type bmwire.MessageError, check
+		// them for equality.
+		if _, ok := err.(*bmwire.MessageError); !ok {
+			if err != test.readErr {
+				t.Errorf("Decode #%d wrong error got: %v, "+
+					"want: %v", i, err, test.readErr)
+				continue
+			}
+		}
+	}
 }
 
 var pubKey1 = &bmwire.PubKey{
@@ -159,6 +218,11 @@ var pubKey2 = &bmwire.PubKey{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
+var tag = &bmwire.ShaHash{
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+}
+
 // basePubKey is used in the various tests as a baseline MsgPubKey.
 var basePubKey = &bmwire.MsgPubKey{
 	Nonce:        123123,                   // 0x1e0f3
@@ -169,6 +233,36 @@ var basePubKey = &bmwire.MsgPubKey{
 	Behavior:     0,
 	SigningKey:   pubKey1,
 	EncryptKey:   pubKey2,
+}
+
+var expandedPubKey = &bmwire.MsgPubKey{
+	Nonce:        123123,                   // 0x1e0f3
+	ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+	ObjectType:   bmwire.ObjectTypePubKey,
+	Version:      3,
+	StreamNumber: 1,
+	Behavior:     0,
+	SigningKey:   pubKey1,
+	EncryptKey:   pubKey2,
+	NonceTrials:  0,
+	ExtraBytes:   0,
+	Signature:    []byte{0, 1, 2, 3},
+}
+
+var encryptedPubKey = &bmwire.MsgPubKey{
+	Nonce:        123123,                   // 0x1e0f3
+	ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+	ObjectType:   bmwire.ObjectTypePubKey,
+	Version:      4,
+	StreamNumber: 1,
+	Behavior:     0,
+	SigningKey:   nil,
+	EncryptKey:   nil,
+	NonceTrials:  0,
+	ExtraBytes:   0,
+	Signature:    nil,
+	Tag:          tag,
+	Encrypted:    []byte{0, 1, 2, 3, 4, 5, 6, 7, 8},
 }
 
 // basePubKeyEncoded is the bmwire.encoded bytes for basePubKey
@@ -196,4 +290,84 @@ var basePubKeyEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Encrypt Key
+}
+
+var expandedPubKeyEncoded = []byte{
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
+	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
+	0x00, 0x00, 0x00, 0x01, // Object Type
+	0x03,                   // Version
+	0x01,                   // Stream Number
+	0x00, 0x00, 0x00, 0x00, // Behavior
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Signing Key
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Encrypt Key
+	0x00, // nonce trials per byte
+	0x00, // extra bytes
+	0x40, // sig length
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sig
+}
+
+var encryptedPubKeyEncoded = []byte{
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
+	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
+	0x00, 0x00, 0x00, 0x01, // Object Type
+	0x04, // Version
+	0x01, // Stream Number
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // tag
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // encrypted
 }
