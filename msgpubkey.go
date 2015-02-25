@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire
 
 import (
@@ -150,6 +146,10 @@ func (msg *MsgPubKey) Command() string {
 // receiver.  This is part of the Message interface implementation.
 func (msg *MsgPubKey) MaxPayloadLength() uint32 {
 	return 1 << 18
+}
+
+func (msg *MsgPubKey) String() string {
+	return fmt.Sprintf("pubkey: v%d %d %s %d %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Tag)
 }
 
 // NewMsgPubKey returns a new object message that conforms to the

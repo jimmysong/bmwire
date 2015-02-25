@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire_test
 
 import (
@@ -36,8 +32,12 @@ func TestPubKey(t *testing.T) {
 			"- got %v, want %v", maxPayload, wantPayload)
 	}
 
-	return
+	str := msg.String()
+	if str[:6] != "pubkey" {
+		t.Errorf("String representation: got %v, want %v", str[:6], "pubkey")
+	}
 
+	return
 }
 
 // TestPubKeyWire tests the MsgPubKey bmwire.encode and decode for

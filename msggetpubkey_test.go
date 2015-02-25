@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire_test
 
 import (
@@ -43,8 +39,8 @@ func TestGetPubKey(t *testing.T) {
 	}
 
 	str := msg.String()
-	if str[:9] != "msgobject" {
-		t.Errorf("String representation: got %v, want %v", str[:9], "msgobject")
+	if str[:9] != "getpubkey" {
+		t.Errorf("String representation: got %v, want %v", str[:9], "getpubkey")
 	}
 
 	return

@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire
 
 import (
@@ -280,18 +276,10 @@ func ReadMessageN(r io.Reader, bmnet BitmessageNet) (int, Message, []byte, error
 			msg = &MsgGetPubKey{}
 		case ObjectTypePubKey:
 			msg = &MsgPubKey{}
-		// case ObjectTypeMsg:
-		// 	msg = &MsgMsg{
-		// 		Nonce:       nonce,
-		// 		ExpiresTime: expires,
-		// 		ObjectType:  objType,
-		// 	}
-		// case ObjectTypeBroadcast:
-		// 	msg = &MsgBroadcast{
-		// 		Nonce:       nonce,
-		// 		ExpiresTime: expires,
-		// 		ObjectType:  objType,
-		// 	}
+		case ObjectTypeMsg:
+			msg = &MsgMsg{}
+		case ObjectTypeBroadcast:
+			msg = &MsgBroadcast{}
 		default:
 			str := fmt.Sprintf("unknown object type %d", objType)
 			return totalBytes, nil, nil, messageError("ReadMessage", str)

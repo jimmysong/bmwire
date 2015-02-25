@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire
 
 import (
@@ -107,7 +103,7 @@ func (msg *MsgGetPubKey) MaxPayloadLength() uint32 {
 }
 
 func (msg *MsgGetPubKey) String() string {
-	return fmt.Sprintf("msgobject getpubkey: v%d %d %s %d %x %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Ripe, msg.Tag)
+	return fmt.Sprintf("getpubkey: v%d %d %s %d %x %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Ripe, msg.Tag)
 }
 
 // NewMsgGetPubKey returns a new object message that conforms to the

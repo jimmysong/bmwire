@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package bmwire_test
 
 import (
@@ -79,6 +75,11 @@ func TestMessage(t *testing.T) {
 	}
 	msgPubKey := bmwire.NewMsgPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
 
+	enc := make([]byte, 99)
+	msgMsg := bmwire.NewMsgMsg(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+
+	msgBroadcast := bmwire.NewMsgBroadcast(123123, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil)
+
 	tests := []struct {
 		in    bmwire.Message       // Value to encode
 		out   bmwire.Message       // Expected decoded value
@@ -93,6 +94,8 @@ func TestMessage(t *testing.T) {
 		{msgGetData, msgGetData, bmwire.MainNet, 25},
 		{msgGetPubKey, msgGetPubKey, bmwire.MainNet, 66},
 		{msgPubKey, msgPubKey, bmwire.MainNet, 178},
+		{msgMsg, msgMsg, bmwire.MainNet, 145},
+		{msgBroadcast, msgBroadcast, bmwire.MainNet, 145},
 	}
 
 	t.Logf("Running %d tests", len(tests))

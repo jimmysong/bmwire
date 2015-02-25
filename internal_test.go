@@ -1,7 +1,3 @@
-// Copyright (c) 2013-2015 Conformal Systems LLC.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 /*
 This test file is part of the bmwire.package rather than than the bmwire.test
 package so it can bridge access to the internals to properly test cases which
